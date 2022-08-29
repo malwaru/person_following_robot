@@ -1,0 +1,6 @@
+numpy 
+opencv-python 
+PyYAML 
+torch 
+torchvision 
+torchaudio 
