@@ -31,7 +31,7 @@ include_directories(include)
 
 # Create Cpp executable
 add_executable(minimal_cpp_pub src/minimal_cpp_pub.cpp)
-ament_target_dependencies(minimal_cpp_pub rclcpp)
+ament_target_dependencies(minimal_cpp_pub rclcpp) 
 # Install Cpp executables
 install(TARGETS
   minimal_cpp_pub
@@ -45,6 +45,8 @@ install(PROGRAMS
   scripts/yolo_infer.py
   scripts/person_tracker.py
   scripts/webcam_publisher.py
+  scripts/tf_static_transformer.py
+  scripts/tf_fake_broadcaster.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

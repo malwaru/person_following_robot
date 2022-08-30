@@ -27,27 +27,28 @@ class PersonTracker(Node):
 
     def __init__(self):
         super().__init__('person_tracker')
+       
         ##Subscribers
         #Subscribe to the bounding box values from the person 
         self._subscriber_rec_person_data = self.create_subscription(
-            Object,
-            'person_following_robot/recognised_person/data',
-            self.rec_person_data_callback,
-            10)
+                                                Object,
+                                                'person_following_robot/recognised_person/data',
+                                                self.rec_person_data_callback,
+                                                10)
         self._subscriber_rec_person_data  # prevent unused variable warning
         #Subscribe to the bounding box values from the person recognised
         self._subscriber_camera_image_raw = self.create_subscription(
-        Image,
-        '/camera/color/image_raw',
-        self.camera_image_raw_callback,
-        10)
+                                                Image,
+                                                '/camera/color/image_raw',
+                                                self.camera_image_raw_callback,
+                                                10)
         self._subscriber_camera_image_raw          
         #Subscribe to the depth vales
         self._subscriber_camera_image_depth = self.create_subscription(
-        Image,
-        '/camera/depth/color/points',
-        self.camera_image_raw_callback,
-        10)
+                                                    PointCloud2,
+                                                    '/camera/depth/color/points',
+                                                    self.camera_image_depth_callback,
+                                                    10)
         self._subscriber_camera_image_depth  
 
 
@@ -58,7 +59,7 @@ class PersonTracker(Node):
         ## Other variables
         self._init_BB=None
         self._cvbridge=CvBridge()
-        self._robot_stream=None  
+        self.robot_stream=None  
         self._tracker = cv2.TrackerCSRT_create()
         self._first_frame=True
         self._yolo_box_received=False
@@ -73,22 +74,23 @@ class PersonTracker(Node):
         y=int(msg.bounding_box[1])
         self.bounding_box=[x,y,w,l]   
         self._yolo_box_received=True
-   
-
-
 
     def camera_image_raw_callback(self,msg):
         '''
         Call back function
         '''
-        self._robot_stream=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
+        self.robot_stream=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
         self.track_object()
 
-    def camera_image_raw_callback(self,msg):
+    def camera_image_depth_callback(self,msg):
         '''
         Call back function for camera depth
         '''
-
+        self.robot_depth_stream = np.asarray(msg.data)
+        rclpy.logging._root_logger.log(
+        'Data'+self.robot_depth_stream.shape,
+        LoggingSeverity.INFO
+        )
 
 
 
@@ -152,34 +154,38 @@ class PersonTracker(Node):
         Tracks the object
         '''
         if (self._first_frame):
-            # initBB = cv2.selectROI('Tracker Frame', cv2.cvtColor(self._robot_stream,cv2.COLOR_RGB2BGR), fromCenter=False)      
-            # self._tracker.init(self._robot_stream,initBB)
+            # initBB = cv2.selectROI('Tracker Frame', cv2.cvtColor(self.robot_stream,cv2.COLOR_RGB2BGR), fromCenter=False)      
+            # self._tracker.init(self.robot_stream,initBB)
             self._init_BB=self.bounding_box
-            self._tracker.init(self._robot_stream,self.bounding_box)
+            self._tracker.init(self.robot_stream,self.bounding_box)
             cv2.destroyAllWindows()  
             self._first_frame=False
-        elif (not self._first_frame) and (self._yolo_box_received):  
-            ret, bbox = self._tracker.update(self._robot_stream)
+
+        if (not self._first_frame) and (self._yolo_box_received):  
+            ret, bbox = self._tracker.update(self.robot_stream)
             if ret:
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                cv2.rectangle(self._robot_stream, p1, p2, (255,0,0), 2, 1)
+                cv2.rectangle(self.robot_stream, p1, p2, (255,0,0), 2, 1)
 
                 ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                 ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                cv2.rectangle(self._robot_stream, ip1, ip2, (0,255,0), 2, 1)
-                cv2.putText(self._robot_stream, "Init BB", ip1, 
+                cv2.rectangle(self.robot_stream, ip1, ip2, (0,255,0), 2, 1)
+                cv2.putText(self.robot_stream, "Init BB", ip1, 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 distance_to_person=self.get_depth(p1,p2)
+ 
+                
             else:
-                cv2.putText(self._robot_stream, "Tracking failure detected", (100,80), 
+                cv2.putText(self.robot_stream, "Tracking failure detected", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
                 distance_to_person=0
                 ##Reinitate tracker
-                self._tracker.init(self._robot_stream,self.bounding_box)
+                self._tracker.init(self.robot_stream,self.bounding_box)
 
         # self.publisher_tracked_person.publish(distance_to_person)
-        cv2.imshow("Tracking", self._robot_stream)
+        cv2.imshow("Tracking",self.robot_stream)
+
         cv2.waitKey(1)
 
 
