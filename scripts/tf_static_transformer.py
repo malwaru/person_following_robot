@@ -10,6 +10,8 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 
 import tf_transformations
 
+import numpy as np
+
 
 class StaticFramePublisher(Node):
    """
@@ -53,9 +55,9 @@ def main():
       LoggingSeverity.INFO
    )
    # obtain parameters from command line arguments
-   tansformation = {"parent_frame": "map",
+   tansformation = {"parent_frame": "base_link",
                   "child_frame": "camera_depth_optical_frame",
-                  "transform": [0, 0, 1, 0, 0, 0]}
+                  "transform": [0, 0, 1, np.deg2rad(-90), 0, 0]}
 # pass parameters and initialize node
    rclpy.init()
    node = StaticFramePublisher(tansformation)
@@ -66,3 +68,6 @@ def main():
       pass
 
    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

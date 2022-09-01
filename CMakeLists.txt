@@ -26,6 +26,18 @@ find_package(std_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 
+# Include launch directory
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Include launch directory
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # Include Cpp "include" directory
 include_directories(include)
 
@@ -55,6 +67,7 @@ install(PROGRAMS
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Object.msg"
   "msg/ObjectList.msg"
+  "msg/TrackedObject.msg"
  )
 
 if(BUILD_TESTING)

@@ -289,7 +289,7 @@ class Inferer(Node):
 def main(args=None):
     rclpy.init(args=args)
     rclpy.logging._root_logger.log(
-            'Started the Yolo inferencing',
+            'Starting the Yolo inferencing .....',
             LoggingSeverity.INFO
         )
     weights=osp.join(ROOT, 'weights/yolov6n.pt')

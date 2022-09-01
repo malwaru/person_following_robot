@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
+
+from turtle import position
+from unicodedata import name
 import rclpy
 from rclpy.node import Node
-from person_following_robot.msg import Object 
+from person_following_robot.msg import Object, TrackedObject
 from std_msgs.msg import Int32
 from rclpy.logging import LoggingSeverity
 from sensor_msgs.msg import Image,PointCloud2
+from person_following_robot.pointcloud2numpy import pointcloud2_to_xyz_array
+# from person_following_robot.pixel2depth import getXYZ
+
 from cv_bridge import CvBridge 
 import cv2
 import numpy as np
@@ -15,7 +21,7 @@ import numpy as np
 ###########################################################################
 ###########################################################################
 ## TO DO:
-## 1. Create a new msg type to send tracking success
+## 1. Use the XYZ to find world coordinates
 ## 2. Use a gaussian filter to cut out the anamolies and get average depth 
 ## 3. If QR code is not available find the largest box
 #############################################################################
@@ -44,22 +50,35 @@ class PersonTracker(Node):
                                                 10)
         self._subscriber_camera_image_raw          
         #Subscribe to the depth vales
+        # self._subscriber_camera_point_depth = self.create_subscription(
+        #                                             PointCloud2,
+        #                                             '/camera/depth/color/points',
+        #                                             self.camera_image_depth_callback,
+        #                                             10)
+        # self._subscriber_camera_point_depth  
+
+
         self._subscriber_camera_image_depth = self.create_subscription(
-                                                    PointCloud2,
-                                                    '/camera/depth/color/points',
+                                                    Image,
+                                                    'camera/depth/image_rect_raw',
                                                     self.camera_image_depth_callback,
                                                     10)
         self._subscriber_camera_image_depth  
 
-
         # Publisher to pubsish person depth
-        self.publisher_tracked_person = self.create_publisher(Int32, 'person_following_robot/tracked_person/distance', 10)
+        self.publisher_tracked_person = self.create_publisher(
+                                                TrackedObject,
+                                                'person_following_robot/tracked_person/data', 
+                                                10)
+
+
 
 
         ## Other variables
         self._init_BB=None
         self._cvbridge=CvBridge()
-        self.robot_stream=None  
+        self.robot_stream=None 
+        self.robot_depth_stream=None 
         self._tracker = cv2.TrackerCSRT_create()
         self._first_frame=True
         self._yolo_box_received=False
@@ -86,11 +105,12 @@ class PersonTracker(Node):
         '''
         Call back function for camera depth
         '''
-        self.robot_depth_stream = np.asarray(msg.data)
-        rclpy.logging._root_logger.log(
-        'Data'+self.robot_depth_stream.shape,
-        LoggingSeverity.INFO
-        )
+        self.robot_depth_stream = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+
+        # self.get_logger().info(f"Received depth")
+
+      
+      
 
 
 
@@ -109,9 +129,25 @@ class PersonTracker(Node):
         ## Get the averge outlier removed 
         ## Find a scale invariant method of geting list of 
 
+
+
+        track_person_data=TrackedObject(name="Person",id=1,success=False,position=[0,0,0])
+
+
         mid_x=int((p1[0]+p2[0])/2)
         mid_y=int((p1[1]+p2[1])/2)
-        depth=0
+        
+        # Depth image size 480, 848
+        # Raw image size 
+
+        if self.robot_depth_stream is not None:
+            depth = self.robot_depth_stream[400,500]
+            # depp=np.asanyarray(depth)
+            self.get_logger().info(f"Robot depth x:{mid_x} depth: {depth}")
+            track_person_data=TrackedObject(name="Person",id=1,success=True,position=[mid_x,mid_y,depth])
+            self.publisher_tracked_person.publish(track_person_data)
+
+
         # point_samples
         #  self._position_grid=np.array([np.tile(np.arange(mid_x+10,plane_origin_x-grid_size,-grid_size)[:,None],(1,grid_shape_y)),\
         #                               np.tile(np.arange(plane_origin_y,plane_origin_y-ysize,-grid_size)[:,None].T,(grid_shape_x,1))],dtype=object)
@@ -119,7 +155,7 @@ class PersonTracker(Node):
 
 
 
-        return 10
+        return track_person_data
 
     def remove_outliers(data, pp1 = 0.01, pp2 = 0.001) -> np.array:
         '''
@@ -173,13 +209,15 @@ class PersonTracker(Node):
                 cv2.rectangle(self.robot_stream, ip1, ip2, (0,255,0), 2, 1)
                 cv2.putText(self.robot_stream, "Init BB", ip1, 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                distance_to_person=self.get_depth(p1,p2)
+                track_person_data=self.get_depth(p1,p2)
+                self.publisher_tracked_person.publish(track_person_data)
  
                 
             else:
                 cv2.putText(self.robot_stream, "Tracking failure detected", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
-                distance_to_person=0
+                track_person_data=TrackedObject(name="Person",id=1,success=False,position=[])
+                self.publisher_tracked_person.publish(track_person_data)
                 ##Reinitate tracker
                 self._tracker.init(self.robot_stream,self.bounding_box)
 
