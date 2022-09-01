@@ -8,11 +8,8 @@ def getXYZ(my_pcl,x,y):
     arrayPosX = arrayPosition + my_pcl.fields[0].offset
     arrayPosY = arrayPosition + my_pcl.fields[1].offset
     arrayPosZ = arrayPosition + my_pcl.fields[2].offset
-
     X = my_pcl.data[arrayPosX]
     Y = my_pcl.data[arrayPosY]
-    X =0.0
-    Y= 0.0
     Z =my_pcl.data[arrayPosZ]
 
 
