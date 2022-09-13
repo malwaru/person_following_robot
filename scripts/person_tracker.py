@@ -8,6 +8,7 @@ from sensor_msgs.msg import Image, PointCloud2
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+import pyrealsense2 as rs
 
 
 
@@ -78,7 +79,28 @@ class PersonTracker(Node):
         self._first_frame=True
         self._yolo_box_received=False
         self.bounding_box=[10,10,10,10]
-        
+
+
+        ## Initiate the pyrealsense
+        rs_pipe = rs.pipeline()
+        rs_config = rs.config()
+        rs_frame_width = 1280
+        rs_frame_height = 720
+        rs_config.enable_stream(rs.stream.depth, rs_frame_width, rs_frame_height, rs.format.z16, 30)
+        rs_config.enable_stream(rs.stream.color, rs_frame_width, rs_frame_height, rs.format.rgb8, 30)
+        dec_filter = rs.decimation_filter()   # Decimation - reduces depth frame density
+        spat_filter = rs.spatial_filter()     # Spatial    - edge-preserving spatial smoothing
+        temp_filter = rs.temporal_filter()    # Temporal   - reduces temporal noise
+        rs_pipe.start(rs_config)
+        align_to = rs.stream.color
+        align = rs.align(align_to)
+
+        temp = rs_pipe.wait_for_frames()
+        aligned_frames = align.process(temp)
+        depth_frame = aligned_frames.get_depth_frame()
+        frame = np.asanyarray(aligned_frames.get_color_frame().get_data(),dtype=np.uint8)
+
+            
 
     def rec_person_data_callback(self, msg):
         ##  Calulate coordintate of top left corner width and height 
