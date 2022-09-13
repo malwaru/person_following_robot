@@ -4,3 +4,4 @@ PyYAML
 torch 
 torchvision 
 torchaudio 
+pyrealsense2

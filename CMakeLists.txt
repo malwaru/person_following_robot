@@ -59,6 +59,7 @@ install(PROGRAMS
   scripts/webcam_publisher.py
   scripts/tf_static_transformer.py
   scripts/tf_fake_broadcaster.py
+  scripts/realsense_camera.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
