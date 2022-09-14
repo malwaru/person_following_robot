@@ -19,7 +19,7 @@ import copy
 # from std_msgs.msg import String
 from sensor_msgs.msg import Image # Image is the message type
 from cv_bridge import CvBridge # convert sensor messages
-from person_following_robot.msg import Object 
+from person_following_robot.msg import Object,ObjectList
 
 
 #YOLO Impoers
@@ -84,11 +84,14 @@ class Inferer(Node):
         #Create subscriber for camera data 
         self.subscription = self.create_subscription(
             Image,
-            '/camera/color/image_raw',
+            'camera/color/image_raw',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warbridningr
+        ## List of all humans 
+        self.publisher_rec_people_data = self.create_publisher(Object, 'person_following_robot/recognised_person/data', 10)        
         self.publisher_rec_person_image = self.create_publisher(Image, 'person_following_robot/recognised_person/image_raw', 10)
+        #
         self.publisher_rec_person_data = self.create_publisher(Object, 'person_following_robot/recognised_person/data', 10)
         self.cvbridge=CvBridge()
   

@@ -27,7 +27,6 @@ def generate_launch_description():
         package="person_following_robot",
         executable="yolo_infer.py"
 
-
     )
 
    

@@ -43,19 +43,11 @@ class PersonTracker(Node):
                                                 '/camera/color/image_raw',
                                                 self.camera_image_raw_callback,
                                                 10)
-        self._subscriber_camera_image_raw          
-        #Subscribe to the depth vales
-        self._subscriber_camera_point_depth = self.create_subscription(
-                                                    PointCloud2,
-                                                    '/camera/depth/color/points',
-                                                    self.camera_image_point_depth_callback,
-                                                    10)
-        self._subscriber_camera_point_depth  
-
+        self._subscriber_camera_image_raw 
 
         self._subscriber_camera_image_depth = self.create_subscription(
                                                     Image,
-                                                    'camera/depth/image_rect_raw',
+                                                    '/aligned_depth_to_color/image_raw',
                                                     self.camera_image_depth_callback,
                                                     10)
         self._subscriber_camera_image_depth  
@@ -69,71 +61,51 @@ class PersonTracker(Node):
 
 
 
-        ## Other variables
+        ## Misc variables
         self._init_BB=None
         self._cvbridge=CvBridge()
-        self.robot_stream=None 
-        self.depth_stream_robot=None 
+        self.robot_stream_colour=None 
+        self.robot_stream_depth=None 
         self.depth_point_stream_robot=None
         self._tracker = cv2.TrackerCSRT_create()
         self._first_frame=True
         self._yolo_box_received=False
         self.bounding_box=[10,10,10,10]
+        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE)
 
 
-        ## Initiate the pyrealsense
-        rs_pipe = rs.pipeline()
-        rs_config = rs.config()
-        rs_frame_width = 1280
-        rs_frame_height = 720
-        rs_config.enable_stream(rs.stream.depth, rs_frame_width, rs_frame_height, rs.format.z16, 30)
-        rs_config.enable_stream(rs.stream.color, rs_frame_width, rs_frame_height, rs.format.rgb8, 30)
-        dec_filter = rs.decimation_filter()   # Decimation - reduces depth frame density
-        spat_filter = rs.spatial_filter()     # Spatial    - edge-preserving spatial smoothing
-        temp_filter = rs.temporal_filter()    # Temporal   - reduces temporal noise
-        rs_pipe.start(rs_config)
-        align_to = rs.stream.color
-        align = rs.align(align_to)
 
-        temp = rs_pipe.wait_for_frames()
-        aligned_frames = align.process(temp)
-        depth_frame = aligned_frames.get_depth_frame()
-        frame = np.asanyarray(aligned_frames.get_color_frame().get_data(),dtype=np.uint8)
-
+       
             
 
     def rec_person_data_callback(self, msg):
-        ##  Calulate coordintate of top left corner width and height 
+        '''
+        Subcribe to the messga and output the bouding box in the format 
+        coordintate of top left corner width and height     
+        '''
         w=int(msg.bounding_box[2]-msg.bounding_box[0])
         l=int(msg.bounding_box[3]-msg.bounding_box[1])
         x=int(msg.bounding_box[0])
         y=int(msg.bounding_box[1])
         self.bounding_box=[x,y,w,l]   
         self._yolo_box_received=True
+        
 
     def camera_image_raw_callback(self,msg):
         '''
-        Call back function
+        Subscribe to the image and conver from ROS image messgae 
+        and convert to RGB format 
         '''
-        self.robot_stream=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
+        self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
         self.track_object()
 
     def camera_image_depth_callback(self,msg):
         '''
-        Call back function for camera depth
+        Call back function for camera depth and decode
+        using passthrough
         '''
-        self.depth_stream_robot = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-
-        # self.get_logger().info(f"Received depth")
-
-      
-    def camera_image_point_depth_callback(self,msg):
-        '''
-        Get the point cloud data from the robot
-        
-        '''
-        self.depth_point_stream_robot=msg
-
+        self.robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+ 
 
     def getXYZ(self,x,y):
         '''
@@ -155,13 +127,10 @@ class PersonTracker(Node):
         arrayPosY = arrayPosition + self.depth_point_stream_robot.fields[1].offset
         arrayPosZ = arrayPosition + self.depth_point_stream_robot.fields[2].offset
         self.get_logger().info(f"\n For x : {x} y: {y} & w: {width}  h:{height} u {u} v{v}\n depth: {len(self.depth_point_stream_robot.data)} x: {arrayPosX} , y:{arrayPosY} , z : {arrayPosZ} \n")
-        # X = self.depth_point_stream_robot.data[arrayPosX]
-        # Y = self.depth_point_stream_robot.data[arrayPosY]
-        # Z = self.depth_point_stream_robot.data[arrayPosZ]
+        X = self.depth_point_stream_robot.data[arrayPosX]
+        Y = self.depth_point_stream_robot.data[arrayPosY]
+        Z = self.depth_point_stream_robot.data[arrayPosZ]
 
-        X=1
-        Y=2
-        Z=2
 
 
         return [X,Y,Z]
@@ -184,8 +153,8 @@ class PersonTracker(Node):
         
         '''
         ## TO D0 :
-        ## Get the averge outlier removed 
-        ## Find a scale invariant method of geting list of 
+        ## Get the outlier removed when finding the average mid point
+        ## Find a scale invariant method of geting list of point of the bounding box mid
 
 
          # point_samples
@@ -201,8 +170,8 @@ class PersonTracker(Node):
         # Depth image size 480, 848
         # Raw image size 
         # Get depth implementation using the image data
-        # if self.depth_stream_robot is not None:
-        #     depth = self.depth_stream_robot[400,500]
+        # if self.robot_stream_depth is not None:
+        #     depth = self.robot_stream_depth[400,500]
         #     # depp=np.asanyarray(depth)
         #     self.get_logger().info(f"Robot depth x:{mid_x} depth: {depth}")
         #     track_person_data=TrackedObject(name="Person",id=1,success=True,position=[mid_x,mid_y,depth])
@@ -210,8 +179,13 @@ class PersonTracker(Node):
 
         # Get depth implemenation using the point cloud data
         position=[0.,0.,0.]
-        if self.depth_point_stream_robot is not None:
-            position=self.getXYZ(mid_x,mid_y)
+
+        if self.robot_stream_depth is not None:
+            mid_z=self.robot_stream_depth[mid_x,mid_y]            
+            self.get_logger().info(f"Received depth {[mid_x,mid_y,mid_z]}")
+            # position=rs.rs2_deproject_pixel_to_point([mid_x,mid_y],mid_z)
+            # self.get_logger().info(f"Received world {[mid_x,mid_y,mid_z]}")
+
 
 
 
@@ -254,25 +228,23 @@ class PersonTracker(Node):
         '''
         Tracks the object
         '''
-        if (self._first_frame):
-            # initBB = cv2.selectROI('Tracker Frame', cv2.cvtColor(self.robot_stream,cv2.COLOR_RGB2BGR), fromCenter=False)      
-            # self._tracker.init(self.robot_stream,initBB)
+        if (self._first_frame):  
             self._init_BB=self.bounding_box
-            self._tracker.init(self.robot_stream,self.bounding_box)
+            self._tracker.init(self.robot_stream_colour,self.bounding_box)
             cv2.destroyAllWindows()  
             self._first_frame=False
 
         if (not self._first_frame) and (self._yolo_box_received):  
-            ret, bbox = self._tracker.update(self.robot_stream)
+            ret, bbox = self._tracker.update(self.robot_stream_colour)
             if ret:
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                cv2.rectangle(self.robot_stream, p1, p2, (255,0,0), 2, 1)
+                cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
 
                 ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                 ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                cv2.rectangle(self.robot_stream, ip1, ip2, (0,255,0), 2, 1)
-                cv2.putText(self.robot_stream, "Init BB", ip1, 
+                cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
+                cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 position=self.get_position(p1,p2)
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
@@ -280,14 +252,14 @@ class PersonTracker(Node):
  
                 
             else:
-                cv2.putText(self.robot_stream, "Tracking failure detected", (100,80), 
+                cv2.putText(self.robot_stream_colour, "Tracking failure detected", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
                 track_person_data=TrackedObject(name="Person",id=1,success=False,position=[])
                 self.publisher_tracked_person.publish(track_person_data)
                 ##Reinitate tracker
-                self._tracker.init(self.robot_stream,self.bounding_box)
+                self._tracker.init(self.robot_stream_colour,self.bounding_box)
 
-        cv2.imshow("Tracking",self.robot_stream)
+        cv2.imshow("Tracking",self.robot_stream_colour)
 
         cv2.waitKey(1)
 
