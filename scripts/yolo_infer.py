@@ -84,15 +84,14 @@ class Inferer(Node):
         #Create subscriber for camera data 
         self.subscription = self.create_subscription(
             Image,
-            'camera/color/image_raw',
+            '/color/image_raw',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warbridningr
         ## List of all humans 
-        self.publisher_rec_people_data = self.create_publisher(Object, 'person_following_robot/recognised_person/data', 10)        
-        self.publisher_rec_person_image = self.create_publisher(Image, 'person_following_robot/recognised_person/image_raw', 10)
-        #
-        self.publisher_rec_person_data = self.create_publisher(Object, 'person_following_robot/recognised_person/data', 10)
+        self.publisher_rec_people_data = self.create_publisher(ObjectList, 'recognised_people/data', 10)        
+        self.publisher_rec_people_image = self.create_publisher(Image, 'recognised_people/image_raw', 10)
+        
         self.cvbridge=CvBridge()
   
 
@@ -168,25 +167,25 @@ class Inferer(Node):
 
         if len(det):
             det[:, :4] = self.rescale(img.shape[2:], det[:, :4], img_src.shape).round()
-
+            #Defining and Id for each person
+            person_id=1
+            recognised_people=ObjectList()
             for *xyxy, conf, cls in reversed(det):      
                 class_num = int(cls)  # integer class
                 label = None if self.hide_labels else (self.class_names[class_num] if self.hide_conf else f'{self.class_names[class_num]} {conf:.2f}')
                 self.plot_box_and_label(img_ori, max(round(sum(img_ori.shape) / 2 * 0.003), 2), xyxy, label, color=self.generate_colors(class_num, True))
-                recognised_person=Object(name=self.class_names[class_num],database_id=1,probability=float(conf),bounding_box=xyxy)
-                self.publisher_rec_person_data.publish(recognised_person)
+                recognised_person=Object(name=self.class_names[class_num],database_id=person_id,probability=float(conf),bounding_box=xyxy)
+                person_id+=1
+                recognised_people.objects.append(recognised_person)
+            self.publisher_rec_people_data.publish(recognised_people)
                 
 
-
-                # obj = Object(pose=target_pose, name="ARUCO_MARKER_"+str(aruco_id[0]), database_id=150)
-                # self._output_obj_list_pub.publish(ObjectList(objects=[obj]))            
+         
 
             img_src = cv2.cvtColor(np.asarray(img_ori),cv2.COLOR_BGR2RGB)     
             #Publish the recognised person       
             img_pub=self.cvbridge.cv2_to_imgmsg(img_src)
-            # cv2.imshow("YOLO",img_src)
-            self.publisher_rec_person_image.publish(img_pub)
-            # cv2.waitKey(1)
+            self.publisher_rec_people_image.publish(img_pub)
 
 
    

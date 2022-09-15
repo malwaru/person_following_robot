@@ -19,27 +19,36 @@ def generate_launch_description():
     # add arrgument "namespace" and "name" if neccessary
     tf_broadcaster=Node(
         package="person_following_robot",
-        executable="tf_static_transformer.py"
+        executable="tf_static_transformer.py",
+        namespace="person_following_robot"
         
     )
 
     yolo_infer=Node(
         package="person_following_robot",
-        executable="yolo_infer.py"
+        executable="yolo_infer.py",
+        namespace="person_following_robot"
 
     )
 
-   
+    aruco_detector=Node(
+        package="person_following_robot",
+        executable="aruco_detector.py",
+        namespace="person_following_robot"
+
+    )
 
     person_tracker=TimerAction(period=10.0,actions=[Node(
         package="person_following_robot",
-        executable="person_tracker.py"
+        executable="person_tracker.py",
+        namespace="person_following_robot"
     )])
 
 
     ld.add_action(tf_broadcaster)
     ld.add_action(yolo_infer)
     ld.add_action(person_tracker)
+    ld.add_action(aruco_detector)
 
 
 

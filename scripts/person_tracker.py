@@ -2,9 +2,9 @@
 
 import rclpy
 from rclpy.node import Node
-from person_following_robot.msg import Object, TrackedObject
+from person_following_robot.msg import ObjectList, TrackedObject
 from rclpy.logging import LoggingSeverity
-from sensor_msgs.msg import Image, PointCloud2
+from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
@@ -32,15 +32,15 @@ class PersonTracker(Node):
         ##Subscribers
         #Subscribe to the bounding box values from the person 
         self._subscriber_rec_person_data = self.create_subscription(
-                                                Object,
-                                                'person_following_robot/recognised_person/data',
-                                                self.rec_person_data_callback,
+                                                ObjectList,
+                                                'person_following_robot/recognised_people/data',
+                                                self.rec_people_data_callback,
                                                 10)
         self._subscriber_rec_person_data  # prevent unused variable warning
-        #Subscribe to the bounding box values from the person recognised
+        #Subscribe to the raw image feed
         self._subscriber_camera_image_raw = self.create_subscription(
                                                 Image,
-                                                '/camera/color/image_raw',
+                                                '/color/image_raw',
                                                 self.camera_image_raw_callback,
                                                 10)
         self._subscriber_camera_image_raw 
@@ -52,10 +52,18 @@ class PersonTracker(Node):
                                                     10)
         self._subscriber_camera_image_depth  
 
+        self._subscriber_aruco_data = self.create_subscription(
+                                                TrackedObject,
+                                                '/color/image_raw',
+                                                self.camera_image_raw_callback,
+                                                10)
+        self._subscriber_aruco_data 
+
+
         # Publisher to pubsish person depth
         self.publisher_tracked_person = self.create_publisher(
                                                 TrackedObject,
-                                                'person_following_robot/tracked_person/data', 
+                                                'tracked_person/data', 
                                                 10)
 
 
@@ -78,16 +86,18 @@ class PersonTracker(Node):
        
             
 
-    def rec_person_data_callback(self, msg):
+    def rec_people_data_callback(self, msg):
         '''
         Subcribe to the messga and output the bouding box in the format 
         coordintate of top left corner width and height     
         '''
-        w=int(msg.bounding_box[2]-msg.bounding_box[0])
-        l=int(msg.bounding_box[3]-msg.bounding_box[1])
-        x=int(msg.bounding_box[0])
-        y=int(msg.bounding_box[1])
-        self.bounding_box=[x,y,w,l]   
+
+        for obj in msg.objects:
+            w=int(obj.bounding_box[2]-obj.bounding_box[0])
+            l=int(obj.bounding_box[3]-obj.bounding_box[1])
+            x=int(obj.bounding_box[0])
+            y=int(obj.bounding_box[1])
+            self.bounding_box=[x,y,w,l]   
         self._yolo_box_received=True
         
 
@@ -228,6 +238,7 @@ class PersonTracker(Node):
         '''
         Tracks the object
         '''
+        ## Intialise the tracker only if firs RGB frame is received and the aruco marker is received
         if (self._first_frame):  
             self._init_BB=self.bounding_box
             self._tracker.init(self.robot_stream_colour,self.bounding_box)

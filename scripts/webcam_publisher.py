@@ -16,7 +16,7 @@ from rclpy.logging import LoggingSeverity
 class WebStream(Node):
 
     def __init__(self, device=0):
-        super().__init__('person_tracker')
+        super().__init__('web_stream')
         self.publisher_webstream = self.create_publisher(Image,
                                                          '/camera/color/image_raw',
                                                          10)

@@ -60,6 +60,7 @@ install(PROGRAMS
   scripts/tf_static_transformer.py
   scripts/tf_fake_broadcaster.py
   scripts/realsense_camera.py
+  scripts/aruco_detector.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
