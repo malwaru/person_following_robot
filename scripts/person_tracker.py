@@ -31,12 +31,12 @@ class PersonTracker(Node):
        
         ##Subscribers
         #Subscribe to the bounding box values from the person 
-        self._subscriber_rec_person_data = self.create_subscription(
+        self._subscriber_rec_people_data = self.create_subscription(
                                                 ObjectList,
                                                 'person_following_robot/recognised_people/data',
                                                 self.rec_people_data_callback,
                                                 10)
-        self._subscriber_rec_person_data  # prevent unused variable warning
+        self._subscriber_rec_people_data  # prevent unused variable warning
         #Subscribe to the raw image feed
         self._subscriber_camera_image_raw = self.create_subscription(
                                                 Image,

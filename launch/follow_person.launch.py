@@ -2,21 +2,38 @@
 # import os
 # from ament_index_python.packages import get_package_share_directory
 
+
+###########################################################################
+###########################################################################
+###########################################################################
+## TO DO:
+## 1. Load data from yaml files
+## 2. Start the tracker when Yolo data is available not with a timer
+
+#############################################################################
+#############################################################################
+#############################################################################
+
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import TimerAction
 
 
 def generate_launch_description():
-    '''
-    To do:
 
-    Run the tracker node when yolo data is available instead of a timer
-    
-    
-    '''
     ld =LaunchDescription()
-    # add arrgument "namespace" and "name" if neccessary
+
+    realsense_camera=Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        parameters=[{'depth_align' :True}],
+        namespace="camera"
+        
+
+    )
+    
+
     tf_broadcaster=Node(
         package="person_following_robot",
         executable="tf_static_transformer.py",
@@ -44,11 +61,11 @@ def generate_launch_description():
         namespace="person_following_robot"
     )])
 
-
+    # ld.add_action(realsense_camera)
     ld.add_action(tf_broadcaster)
-    ld.add_action(yolo_infer)
-    ld.add_action(person_tracker)
     ld.add_action(aruco_detector)
+    ld.add_action(yolo_infer)
+    # ld.add_action(person_tracker)
 
 
 

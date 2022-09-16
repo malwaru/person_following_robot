@@ -13,6 +13,7 @@ from person_following_robot.msg import TrackedObject
 ## TO DO:
 ## 1. Search for markers only when the tracking is missing
 ## 2. Track multiple aruco
+## 3. Load topic names from params
 #############################################################################
 #############################################################################
 #############################################################################
@@ -31,7 +32,7 @@ class ArucoDetector(Node):
         # Publisher to pubsish person depth
         self.publisher_aruco_data = self.create_publisher(
                                                 TrackedObject,
-                                                'aruco_data', 
+                                                'person_following/aruco_data', 
                                                 10)
 
 
@@ -95,7 +96,7 @@ class ArucoDetector(Node):
                 cv2.putText(stream, str(markerID),
                     (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 255, 0), 2)
-                marker_data=TrackedObject(name="Aruco",id=markerID,success=True,position=[cX,cY])
+                marker_data=TrackedObject(name="Aruco",id=int(markerID),success=True,position=[cX,cY])
                 self.publisher_aruco_data.publish(marker_data)
 
                 # print(f"[INFO] ArUco marker ID: {markerID}")
@@ -104,7 +105,7 @@ class ArucoDetector(Node):
                 cv2.putText(stream,"No marker",
                     (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 0, 255), 2)
-                marker_data=TrackedObject(name="Aruco",id=None,success=False,position=[])
+                marker_data=TrackedObject(name="Aruco",id=0,success=False,position=[])
                 self.publisher_aruco_data.publish(marker_data)
         cv2.imshow("Image", stream)
         cv2.waitKey(1)
