@@ -164,17 +164,15 @@ class PersonTracker(Node):
         '''
         ## TO D0 :
         ## Get the outlier removed when finding the average mid point
-        ## Find a scale invariant method of geting list of point of the bounding box mid
-
-
-         # point_samples
-        #  self._position_grid=np.array([np.tile(np.arange(mid_x+10,plane_origin_x-grid_size,-grid_size)[:,None],(1,grid_shape_y)),\
-        #                               np.tile(np.arange(plane_origin_y,plane_origin_y-ysize,-grid_size)[:,None].T,(grid_shape_x,1))],dtype=object)
-
-        #Get most accurate point for depth
+        ## Find a scale invariant method of geting list of point of the bounding box mid    
 
         mid_x=int((p1[0]+p2[0])/2)
         mid_y=int((p1[1]+p2[1])/2)
+             # point_samples
+        #  self._position_grid=np.array([np.tile(np.arange(mid_x+10,plane_origin_x-grid_size,-grid_size)[:,None],(1,grid_shape_y)),\
+        #                               np.tile(np.arange(plane_origin_y,plane_origin_y-ysize,-grid_size)[:,None].T,(grid_shape_x,1))],dtype=object)
+ 
+        #Get most accurate point for depth
 
         
         # Depth image size 480, 848
