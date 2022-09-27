@@ -1,1 +1,0 @@
-rclcpp;rclpy;cv_bridge;sensor_msgs;opencv-python;std_msgs;rosidl_default_runtime;geometry_msgs;tf_transformations;tf2_ros;ros2launch;ament_lint_auto;ament_lint_common
