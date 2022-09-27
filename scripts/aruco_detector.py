@@ -13,7 +13,7 @@ from person_following_robot.msg import TrackedObject
 ## TO DO:
 ## 1. Search for markers only when the tracking is missing
 ## 2. Track multiple aruco
-## 3. Load topic names from params
+## 3. Load topic names from params 
 #############################################################################
 #############################################################################
 #############################################################################

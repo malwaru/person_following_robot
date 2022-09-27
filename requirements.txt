@@ -1,6 +1,6 @@
 numpy
 empy 
-opencv-python 
+opencv-contrib-python
 PyYAML 
 torch 
 torchvision 
