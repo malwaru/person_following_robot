@@ -32,7 +32,7 @@ class ArucoDetector(Node):
         # Publisher to pubsish person depth
         self.publisher_aruco_data = self.create_publisher(
                                                 TrackedObject,
-                                                'person_following/aruco_data', 
+                                                'aruco_data', 
                                                 10)
 
 
@@ -64,7 +64,7 @@ class ArucoDetector(Node):
         (corners, ids, rejected) = cv2.aruco.detectMarkers(stream, self.arucoDict,parameters=self.arucoParams)
         topLeft=[20,50]
         topRight=[10,10]
-        cv2.namedWindow("Image",cv2.WINDOW_FREERATIO)
+        # cv2.namedWindow("Image",cv2.WINDOW_FREERATIO)
 
         if len(corners) > 0:
             # flatten the ArUco IDs list
@@ -107,8 +107,8 @@ class ArucoDetector(Node):
                     0.5, (0, 0, 255), 2)
                 marker_data=TrackedObject(name="Aruco",id=0,success=False,position=[])
                 self.publisher_aruco_data.publish(marker_data)
-        cv2.imshow("Image", stream)
-        cv2.waitKey(1)
+        # cv2.imshow("Image", stream)
+        # cv2.waitKey(1)
 
 
 def main(args=None):

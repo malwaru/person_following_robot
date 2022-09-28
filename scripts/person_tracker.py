@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from turtle import position
 import rclpy
 from rclpy.node import Node
 from person_following_robot.msg import ObjectList, TrackedObject
@@ -33,7 +34,7 @@ class PersonTracker(Node):
         #Subscribe to the bounding box values from the person 
         self._subscriber_rec_people_data = self.create_subscription(
                                                 ObjectList,
-                                                'person_following_robot/recognised_people/data',
+                                                '/person_following_robot/recognised_people/data',
                                                 self.rec_people_data_callback,
                                                 10)
         self._subscriber_rec_people_data  # prevent unused variable warning
@@ -54,8 +55,8 @@ class PersonTracker(Node):
 
         self._subscriber_aruco_data = self.create_subscription(
                                                 TrackedObject,
-                                                '/color/image_raw',
-                                                self.camera_image_raw_callback,
+                                                '/person_following_robot/aruco_data',
+                                                self.aruco_data_callback,
                                                 10)
         self._subscriber_aruco_data 
 
@@ -75,29 +76,28 @@ class PersonTracker(Node):
         self.robot_stream_colour=None 
         self.robot_stream_depth=None 
         self.depth_point_stream_robot=None
+        self.aruco_data={"success":False,"position":[0,0]}
         self._tracker = cv2.TrackerCSRT_create()
         self._first_frame=True
         self._yolo_box_received=False
         self.bounding_box=[10,10,10,10]
-        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE)
-
-
-
-       
+        self.recognised_people=[]
+        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE)       
             
 
-    def rec_people_data_callback(self, msg):
+    def rec_people_data_callback(self,msg):
         '''
         Subcribe to the messga and output the bouding box in the format 
         coordintate of top left corner width and height     
         '''
+        # recognised_person=Object(name=self.class_names[class_num],database_id=person_id,probability=float(conf),bounding_box=xyxy)
 
         for obj in msg.objects:
             w=int(obj.bounding_box[2]-obj.bounding_box[0])
             l=int(obj.bounding_box[3]-obj.bounding_box[1])
             x=int(obj.bounding_box[0])
             y=int(obj.bounding_box[1])
-            self.bounding_box=[x,y,w,l]   
+            self.recognised_people=[[obj.database_id,[x,y,w,l]]]
         self._yolo_box_received=True
         
 
@@ -115,7 +115,49 @@ class PersonTracker(Node):
         using passthrough
         '''
         self.robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
- 
+
+    def aruco_data_callback(self,msg):
+        '''
+        Callback function for the aruco marker data
+
+        Params
+        -------
+        msg.name    : The name aruco
+        msg.id      : Id of the aruco 
+        msg.success : Success status of detecting 
+        msg.position: position on the frame 
+        
+        '''
+        pass
+
+        self.aruco_data["success"]=msg.success
+        self.aruco_data["position"]=msg.position
+
+        # name="Aruco",id=int(markerID),success=True,position=[cX,cY]
+
+    def check_leader(self):
+        '''
+        Check if the people in the bounding box is also marked with an 
+        aruco marker a leader
+
+        Returns
+        --------
+        If Leader was found and the bounding box
+        '''
+        leader_status=False
+        bounding_box=[]    
+        if self.aruco_data["success"]==True:   
+            aruco_center=self.aruco_data["position"]
+            for person in self.recognised_people:
+                #If true        
+                bounding_box=person[1]
+                self.get_logger().info(f"Received leader aru center :{aruco_center} person :{person[1]}")
+
+                            # recognised_person=Object(name=self.class_names[class_num],database_id=person_id,probability=float(conf),bounding_box=xyxy)
+
+        return leader_status,bounding_box
+
+
 
     def getXYZ(self,x,y):
         '''
@@ -192,14 +234,7 @@ class PersonTracker(Node):
             mid_z=self.robot_stream_depth[mid_x,mid_y]            
             self.get_logger().info(f"Received depth {[mid_x,mid_y,mid_z]}")
             # position=rs.rs2_deproject_pixel_to_point([mid_x,mid_y],mid_z)
-            # self.get_logger().info(f"Received world {[mid_x,mid_y,mid_z]}")
-
-
-
-
-        ## Testing the new gitlab import
-
-       
+            # self.get_logger().info(f"Received world {[mid_x,mid_y,mid_z]}")      
 
 
         return position
@@ -236,12 +271,14 @@ class PersonTracker(Node):
         '''
         Tracks the object
         '''
-        ## Intialise the tracker only if firs RGB frame is received and the aruco marker is received
-        if (self._first_frame):  
-            self._init_BB=self.bounding_box
-            self._tracker.init(self.robot_stream_colour,self.bounding_box)
-            cv2.destroyAllWindows()  
-            self._first_frame=False
+        ## Intialise the tracker only if first RGB frame is received and the aruco marker is received
+        if (self._first_frame): 
+            ## Check if bounding box in
+            leader_sucess,bb_box=self.check_leader()
+            if leader_sucess:
+                self._init_BB=self.bounding_box
+                self._tracker.init(self.robot_stream_colour,bb_box)
+                self._first_frame=False
 
         if (not self._first_frame) and (self._yolo_box_received):  
             ret, bbox = self._tracker.update(self.robot_stream_colour)
@@ -250,11 +287,11 @@ class PersonTracker(Node):
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
                 cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
 
-                ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
-                ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                # ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
+                # ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
+                # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
+                # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
+                #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 position=self.get_position(p1,p2)
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
                 self.publisher_tracked_person.publish(track_person_data)
@@ -266,10 +303,11 @@ class PersonTracker(Node):
                 track_person_data=TrackedObject(name="Person",id=1,success=False,position=[])
                 self.publisher_tracked_person.publish(track_person_data)
                 ##Reinitate tracker
-                self._tracker.init(self.robot_stream_colour,self.bounding_box)
+                leader_sucess,bb_box=self.check_leader()
+                if leader_sucess:
+                    self._tracker.init(self.robot_stream_colour,bb_box)
 
         cv2.imshow("Tracking",self.robot_stream_colour)
-
         cv2.waitKey(1)
 
 
