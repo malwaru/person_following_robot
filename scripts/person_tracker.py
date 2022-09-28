@@ -145,13 +145,28 @@ class PersonTracker(Node):
         If Leader was found and the bounding box
         '''
         leader_status=False
-        bounding_box=[]    
-        if self.aruco_data["success"]==True:   
-            aruco_center=self.aruco_data["position"]
+        bounding_box=[]  
+        # self.get_logger().info(f"Debug: In check leader")  
+        if self.aruco_data["success"]==True:
+            # self.get_logger().info(f"Debug: aruco_success")
+            aruco_center=[int(self.aruco_data["position"][0]),int(self.aruco_data["position"][1])]
             for person in self.recognised_people:
-                #If true        
-                bounding_box=person[1]
-                self.get_logger().info(f"Received leader aru center :{aruco_center} person :{person[1]}")
+                x=person[1][0]
+                y=person[1][1]
+                w=person[1][2]
+                l=person[1][3]
+                self.get_logger().info(f"Debug: aruco_center {aruco_center} person {[x,y,w,l]}")  
+
+
+
+                if (aruco_center[0]>=x) and (aruco_center[0]<=x+w) and (aruco_center[1]>=y) and (aruco_center[1]<=y+l):
+                    bounding_box=person[1]
+                    leader_status=True
+                    self.get_logger().info(f"Debug: In leader")  
+
+                
+
+                # self.get_logger().info(f"Received leader aru center :{aruco_center} person :{person[1]}")
 
                             # recognised_person=Object(name=self.class_names[class_num],database_id=person_id,probability=float(conf),bounding_box=xyxy)
 
@@ -230,9 +245,9 @@ class PersonTracker(Node):
         # Get depth implemenation using the point cloud data
         position=[0.,0.,0.]
 
-        if self.robot_stream_depth is not None:
-            mid_z=self.robot_stream_depth[mid_x,mid_y]            
-            self.get_logger().info(f"Received depth {[mid_x,mid_y,mid_z]}")
+        # if self.robot_stream_depth is not None:
+        #     mid_z=self.robot_stream_depth[mid_x,mid_y]            
+        #     self.get_logger().info(f"Received depth {[mid_x,mid_y,mid_z]}")
             # position=rs.rs2_deproject_pixel_to_point([mid_x,mid_y],mid_z)
             # self.get_logger().info(f"Received world {[mid_x,mid_y,mid_z]}")      
 
