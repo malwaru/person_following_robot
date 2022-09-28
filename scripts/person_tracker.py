@@ -19,7 +19,7 @@ import pyrealsense2 as rs
 ## TO DO:
 ## 1. Use the XYZ to find world coordinates
 ## 2. Use a gaussian filter to cut out the anamolies and get average depth 
-## 3. If QR code is not available find the largest box
+##
 #############################################################################
 #############################################################################
 #############################################################################
@@ -90,8 +90,6 @@ class PersonTracker(Node):
         Subcribe to the messga and output the bouding box in the format 
         coordintate of top left corner width and height     
         '''
-        # recognised_person=Object(name=self.class_names[class_num],database_id=person_id,probability=float(conf),bounding_box=xyxy)
-
         for obj in msg.objects:
             w=int(obj.bounding_box[2]-obj.bounding_box[0])
             l=int(obj.bounding_box[3]-obj.bounding_box[1])
@@ -128,12 +126,8 @@ class PersonTracker(Node):
         msg.position: position on the frame 
         
         '''
-        pass
-
         self.aruco_data["success"]=msg.success
         self.aruco_data["position"]=msg.position
-
-        # name="Aruco",id=int(markerID),success=True,position=[cX,cY]
 
     def check_leader(self):
         '''
@@ -146,30 +140,16 @@ class PersonTracker(Node):
         '''
         leader_status=False
         bounding_box=[]  
-        # self.get_logger().info(f"Debug: In check leader")  
         if self.aruco_data["success"]==True:
-            # self.get_logger().info(f"Debug: aruco_success")
             aruco_center=[int(self.aruco_data["position"][0]),int(self.aruco_data["position"][1])]
             for person in self.recognised_people:
                 x=person[1][0]
                 y=person[1][1]
                 w=person[1][2]
                 l=person[1][3]
-                self.get_logger().info(f"Debug: aruco_center {aruco_center} person {[x,y,w,l]}")  
-
-
-
                 if (aruco_center[0]>=x) and (aruco_center[0]<=x+w) and (aruco_center[1]>=y) and (aruco_center[1]<=y+l):
                     bounding_box=person[1]
                     leader_status=True
-                    self.get_logger().info(f"Debug: In leader")  
-
-                
-
-                # self.get_logger().info(f"Received leader aru center :{aruco_center} person :{person[1]}")
-
-                            # recognised_person=Object(name=self.class_names[class_num],database_id=person_id,probability=float(conf),bounding_box=xyxy)
-
         return leader_status,bounding_box
 
 
@@ -288,7 +268,7 @@ class PersonTracker(Node):
         '''
         ## Intialise the tracker only if first RGB frame is received and the aruco marker is received
         if (self._first_frame): 
-            ## Check if bounding box in
+            ## Check if bounding box inside a leader 
             leader_sucess,bb_box=self.check_leader()
             if leader_sucess:
                 self._init_BB=self.bounding_box
@@ -302,11 +282,11 @@ class PersonTracker(Node):
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
                 cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
 
-                # ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
-                # ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
-                #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
+                ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
+                cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
+                cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 position=self.get_position(p1,p2)
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
                 self.publisher_tracked_person.publish(track_person_data)
@@ -320,6 +300,12 @@ class PersonTracker(Node):
                 ##Reinitate tracker
                 leader_sucess,bb_box=self.check_leader()
                 if leader_sucess:
+                    self._init_BB=bb_box
+                    ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
+                    ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
+                    cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
+                    cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                     self._tracker.init(self.robot_stream_colour,bb_box)
 
         cv2.imshow("Tracking",self.robot_stream_colour)
