@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from turtle import pos
 import rclpy
 from rclpy.node import Node
 from person_following_robot.msg import ObjectList, TrackedObject
@@ -298,8 +299,18 @@ class PersonTracker(Node):
                 # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
                 # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
                                     # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                print_pos="z:"+str(position[0])+"y:"+str(position[1])+"z:"+str(position[2])
-                cv2.putText(self.robot_stream_colour, print_pos, p1, 
+                # print_pos="x: "+str(position[0])+"\ny: "+str(position[1])+"\nz: "+str(position[2])
+                # y0, dy = p1[1], 20
+                # for i, line in enumerate(print_pos.split('\n')):
+                #     y = y0 + i*dy
+                #     cv2.putText(self.robot_stream_colour, line, (p1[0]+20, y ), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                if np.isclose(np.sum(position),.0,1e-3):
+                    print_pos="Invalid box"
+                else:
+                    # print_pos="x: "+str(position[0])+"  y: "+str(position[1])+"  z: "+str(position[2])
+                    print_pos="Depth: "+str(position[2])
+
+                cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
