@@ -1,8 +1,0 @@
-{
-  "package_name": "person_following_robot",
-  "non_idl_tuples": [
-    "/home/malika/foxy_ws/src/person_following_robot:msg/Object.msg",
-    "/home/malika/foxy_ws/src/person_following_robot:msg/ObjectList.msg",
-    "/home/malika/foxy_ws/src/person_following_robot:msg/TrackedObject.msg"
-  ]
-}
