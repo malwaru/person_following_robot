@@ -82,6 +82,7 @@ class PersonTracker(Node):
         self.depth_point_stream_robot=None
         self.aruco_data={"success":False,"position":[0,0]}
         self._tracker = cv2.TrackerCSRT_create()
+        # self._tracker = cv2.TrackerMOSSE_create()
         self._first_frame=True
         self._yolo_box_received=False
         self.recognised_people=[]
@@ -236,7 +237,6 @@ class PersonTracker(Node):
         if (self.robot_stream_depth is not None) and valid_frame:
             
             mid_z=self.robot_stream_depth[mid_x,mid_y]            
-            # self.get_logger().info(f"\n mid:{[mid_x,mid_y,mid_z]}, \n depth_shape: {self.robot_stream_depth.shape} \n color_shape: {self.robot_stream_colour.shape}")
             position=[mid_x/1000,mid_y/1000,mid_z/1000]
             # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
             # self.get_logger().info(f"Received world {position}")      
@@ -292,7 +292,7 @@ class PersonTracker(Node):
                 
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
+                # cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
                 position=self.get_position(p1,p2)
                 ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                 ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
@@ -305,10 +305,12 @@ class PersonTracker(Node):
                 #     y = y0 + i*dy
                 #     cv2.putText(self.robot_stream_colour, line, (p1[0]+20, y ), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 if np.isclose(np.sum(position),.0,1e-3):
-                    print_pos="Invalid box"
+                    print_pos="Tracking invalid"
                 else:
                     # print_pos="x: "+str(position[0])+"  y: "+str(position[1])+"  z: "+str(position[2])
-                    print_pos="Depth: "+str(position[2])
+                    print_pos="Depth: "+str(position[2])+"m"
+                    cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
+
 
                 cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
