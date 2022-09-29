@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-
-from turtle import position
 import rclpy
 from rclpy.node import Node
 from person_following_robot.msg import ObjectList, TrackedObject
@@ -9,6 +7,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+import copy
 import pyrealsense2 as rs
 
 
@@ -84,9 +83,9 @@ class PersonTracker(Node):
         self._tracker = cv2.TrackerCSRT_create()
         self._first_frame=True
         self._yolo_box_received=False
-        self.bounding_box=[10,10,10,10]
         self.recognised_people=[]
-        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE)       
+        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE) 
+        self.image_size=(480,640)      
             
 
     def rec_people_data_callback(self,msg):
@@ -205,10 +204,15 @@ class PersonTracker(Node):
         '''
         ## TO D0 :
         ## Get the outlier removed when finding the average mid point
-        ## Find a scale invariant method of geting list of point of the bounding box mid    
+        ## Find a scale invariant method of geting list of point of the bounding box mid  
+        #   
+        
+        mid_x=int((p1[0]+p2[0])/2)
+        mid_y=int((p1[1]+p2[1])/2)
+        valid_frame=True
 
-        mid_x=(p1[0]+p2[0])/2
-        mid_y=(p1[1]+p2[1])/2
+        if mid_x>=self.image_size[0] or mid_y >= self.image_size[1] or mid_x<=0 or mid_y<=0:
+            valid_frame=False
              # point_samples
         #  self._position_grid=np.array([np.tile(np.arange(mid_x+10,plane_origin_x-grid_size,-grid_size)[:,None],(1,grid_shape_y)),\
         #                               np.tile(np.arange(plane_origin_y,plane_origin_y-ysize,-grid_size)[:,None].T,(grid_shape_x,1))],dtype=object)
@@ -228,12 +232,13 @@ class PersonTracker(Node):
         # Get depth implemenation using the point cloud data
         position=[0.,0.,0.]
 
-        if self.robot_stream_depth is not None:
+        if (self.robot_stream_depth is not None) and valid_frame:
             
-            # mid_z=self.robot_stream_depth[mid_x,mid_y]            
-            self.get_logger().info(f"Received depth {[mid_x,mid_y]} with depth shape {self.robot_stream_depth.shape}")
-            # position=rs.rs2_deproject_pixel_to_point([mid_x,mid_y],mid_z)
-            # self.get_logger().info(f"Received world {[mid_x,mid_y,mid_z]}")      
+            mid_z=self.robot_stream_depth[mid_x,mid_y]            
+            # self.get_logger().info(f"\n mid:{[mid_x,mid_y,mid_z]}, \n depth_shape: {self.robot_stream_depth.shape} \n color_shape: {self.robot_stream_colour.shape}")
+            position=[mid_x/1000,mid_y/1000,mid_z/1000]
+            # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
+            # self.get_logger().info(f"Received world {position}")      
 
 
         return position
@@ -275,22 +280,26 @@ class PersonTracker(Node):
             ## Check if bounding box inside a leader 
             leader_sucess,l_bb_box=self.check_leader()
             if leader_sucess:
-                self._init_BB=self.bounding_box
+                self._init_BB=l_bb_box
                 self._tracker.init(self.robot_stream_colour,l_bb_box)
                 self._first_frame=False
 
         if (not self._first_frame) and (self._yolo_box_received):  
-            ret, bbox = self._tracker.update(self.robot_stream_colour)
+            ret,bbox = self._tracker.update(self.robot_stream_colour)
             if ret:
+                ##Sending the mid point of the bound box to get position function 
+                
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                ##Sending the mid point of the bound box to get position function 
-                position=self.get_position(p1,p2)
                 cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
+                position=self.get_position(p1,p2)
                 ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                 ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
+                # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
+                # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
+                                    # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                print_pos="z:"+str(position[0])+"y:"+str(position[1])+"z:"+str(position[2])
+                cv2.putText(self.robot_stream_colour, print_pos, p1, 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
@@ -298,7 +307,7 @@ class PersonTracker(Node):
  
                 
             else:
-                cv2.putText(self.robot_stream_colour, "Tracking failure detected", (100,80), 
+                cv2.putText(self.robot_stream_colour, "Tracking failed", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
                 track_person_data=TrackedObject(name="Person",id=1,success=False,position=[])
                 self.publisher_tracked_person_data.publish(track_person_data)
@@ -308,9 +317,9 @@ class PersonTracker(Node):
                     self._init_BB=l_bb_box
                     ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                     ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                    cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                    cv2.putText(self.robot_stream_colour, "Re init BB", ip1, 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                    # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
+                    # cv2.putText(self.robot_stream_colour, "Re-init BB", ip1, 
+                                        # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                     self._tracker.init(self.robot_stream_colour,l_bb_box)
         self.publisher_tracked_person_image.publish(self._cvbridge.cv2_to_imgmsg(self.robot_stream_colour))
         cv2.imshow("Tracking",self.robot_stream_colour)
