@@ -9,3 +9,6 @@ venv.bak/
 
 #vscode
 .vscode/
+
+#Other files
+build/
