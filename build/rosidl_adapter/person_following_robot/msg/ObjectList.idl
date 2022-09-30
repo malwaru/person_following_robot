@@ -1,0 +1,15 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from person_following_robot/msg/ObjectList.msg
+// generated code does not contain a copyright notice
+
+#include "person_following_robot/msg/Object.idl"
+
+module person_following_robot {
+  module msg {
+    @verbatim (language="comment", text=
+      " A list of objects")
+    struct ObjectList {
+      sequence<person_following_robot::msg::Object> objects;
+    };
+  };
+};

@@ -82,7 +82,6 @@ class PersonTracker(Node):
         self.depth_point_stream_robot=None
         self.aruco_data={"success":False,"position":[0,0]}
         self._tracker = cv2.TrackerCSRT_create()
-        # self._tracker = cv2.TrackerMOSSE_create()
         self._first_frame=True
         self._yolo_box_received=False
         self.recognised_people=[]
@@ -109,7 +108,9 @@ class PersonTracker(Node):
         Subscribe to the image and conver from ROS image messgae 
         and convert to RGB format 
         '''
-        self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
+        # self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
+        self.robot_stream_colour=self._cvbridge.imgmsg_to_cv2(msg)
+
         self.track_object()
 
     def camera_image_depth_callback(self,msg):
@@ -158,36 +159,6 @@ class PersonTracker(Node):
         return leader_status,bounding_box
 
 
-
-    def getXYZ(self,x,y):
-        '''
-        https://pastebin.com/i71RQcU2
-        https://github.com/stereolabs/zed-ros-wrapper/issues/370
-        '''
-
-        width = self.depth_point_stream_robot.width
-        height = self.depth_point_stream_robot.height
-
-        u=int(x/width)
-        v=int(y/height)
-        
-
-        # // Convert from u (column / width), v (row/height) to position in array
-        # // where X,Y,Z data starts
-        arrayPosition=v*self.depth_point_stream_robot.row_step + u*self.depth_point_stream_robot.point_step
-        arrayPosX = arrayPosition + self.depth_point_stream_robot.fields[0].offset
-        arrayPosY = arrayPosition + self.depth_point_stream_robot.fields[1].offset
-        arrayPosZ = arrayPosition + self.depth_point_stream_robot.fields[2].offset
-        self.get_logger().info(f"\n For x : {x} y: {y} & w: {width}  h:{height} u {u} v{v}\n depth: {len(self.depth_point_stream_robot.data)} x: {arrayPosX} , y:{arrayPosY} , z : {arrayPosZ} \n")
-        X = self.depth_point_stream_robot.data[arrayPosX]
-        Y = self.depth_point_stream_robot.data[arrayPosY]
-        Z = self.depth_point_stream_robot.data[arrayPosZ]
-
-
-
-        return [X,Y,Z]
-
-
     def get_position(self,p1,p2):
         '''Get the distance to the person 
            Removes outliers and get the average distance to 
@@ -215,31 +186,61 @@ class PersonTracker(Node):
 
         if mid_x>=self.image_size[0] or mid_y >= self.image_size[1] or mid_x<=0 or mid_y<=0:
             valid_frame=False
-             # point_samples
-        #  self._position_grid=np.array([np.tile(np.arange(mid_x+10,plane_origin_x-grid_size,-grid_size)[:,None],(1,grid_shape_y)),\
-        #                               np.tile(np.arange(plane_origin_y,plane_origin_y-ysize,-grid_size)[:,None].T,(grid_shape_x,1))],dtype=object)
- 
-        #Get most accurate point for depth
 
-        
-        # Depth image size 480, 848
-        # Raw image size 
-        # Get depth implementation using the image data
-        # if self.robot_stream_depth is not None:
-        #     depth = self.robot_stream_depth[400,500]
-        #     # depp=np.asanyarray(depth)
-        #     self.get_logger().info(f"Robot depth x:{mid_x} depth: {depth}")
-        #     track_person_data=TrackedObject(name="Person",id=1,success=True,position=[mid_x,mid_y,depth])
-
-        # Get depth implemenation using the point cloud data
         position=[0.,0.,0.]
 
         if (self.robot_stream_depth is not None) and valid_frame:
             
             mid_z=self.robot_stream_depth[mid_x,mid_y]            
             position=[mid_x/1000,mid_y/1000,mid_z/1000]
+
             # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
             # self.get_logger().info(f"Received world {position}")      
+
+
+        return position
+
+    def get_position_2(self,p1,p2):
+        '''Get the distance to the person 
+           Removes outliers and get the average distance to 
+           the mid point of the bounding box
+
+           Params:
+           --------
+           p1 : Top left corner of bounding box
+           p2 : Bottom right corner of bounding box
+
+           Returns:
+           -------
+           position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
+           
+        
+        '''
+        ## TO D0 :
+        ## Get point with min distance in the bounding box
+
+        # self.get_logger().info(f"\n Depth p1: {p1} p2 :{p2}")   
+        pass   
+
+        
+        min_dis=0.
+        valid_frame=True
+        if p2[0]>=self.image_size[0] or p2[1] >= self.image_size[1]:
+            valid_frame=False
+
+        position=[0.,0.,0.]
+
+        if valid_frame:
+            for x in range(p1[0],p2[0]):
+                for y in range(p1[1],p2[1]):
+                    current_dis=self.robot_stream_depth[x,y]  
+                    if current_dis<=min_dis:
+                        min_dis=current_dis
+                        position[0]=float(x)
+                        position[1]=float(y)
+                        position[2]=current_dis
+
+      
 
 
         return position
@@ -292,24 +293,19 @@ class PersonTracker(Node):
                 
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                # cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
-                position=self.get_position(p1,p2)
+                cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
+                self.get_logger().info(f"\n trackershape: {self.robot_stream_colour.shape} rec: p1: {p1}p2 :{p2}")
+                position=self.get_position_2(p1,p2)
                 ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                 ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
                 # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
                 # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
                                     # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                # print_pos="x: "+str(position[0])+"\ny: "+str(position[1])+"\nz: "+str(position[2])
-                # y0, dy = p1[1], 20
-                # for i, line in enumerate(print_pos.split('\n')):
-                #     y = y0 + i*dy
-                #     cv2.putText(self.robot_stream_colour, line, (p1[0]+20, y ), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 if np.isclose(np.sum(position),.0,1e-3):
                     print_pos="Tracking invalid"
                 else:
-                    # print_pos="x: "+str(position[0])+"  y: "+str(position[1])+"  z: "+str(position[2])
                     print_pos="Depth: "+str(position[2])+"m"
-                    cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
+                    # cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
 
 
                 cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
@@ -322,7 +318,7 @@ class PersonTracker(Node):
             else:
                 cv2.putText(self.robot_stream_colour, "Tracking failed", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
-                track_person_data=TrackedObject(name="Person",id=1,success=False,position=[])
+                track_person_data=TrackedObject(name="Person",id=0,success=False,position=[])
                 self.publisher_tracked_person_data.publish(track_person_data)
                 ##Reinitate tracker
                 leader_sucess,l_bb_box=self.check_leader()

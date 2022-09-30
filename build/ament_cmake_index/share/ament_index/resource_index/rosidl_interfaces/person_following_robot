@@ -1,0 +1,6 @@
+msg/Object.idl
+msg/Object.msg
+msg/ObjectList.idl
+msg/ObjectList.msg
+msg/TrackedObject.idl
+msg/TrackedObject.msg

@@ -1,0 +1,26 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from person_following_robot/msg/TrackedObject.msg
+// generated code does not contain a copyright notice
+
+
+module person_following_robot {
+  module msg {
+    @verbatim (language="comment", text=
+      " Tracked object name eg : person, car etc")
+    struct TrackedObject {
+      string name;
+
+      @verbatim (language="comment", text=
+        "ID for tracked object")
+      int32 id;
+
+      @verbatim (language="comment", text=
+        " Tracked success")
+      boolean success;
+
+      @verbatim (language="comment", text=
+        "Position coordinates in XYZ")
+      sequence<float> position;
+    };
+  };
+};

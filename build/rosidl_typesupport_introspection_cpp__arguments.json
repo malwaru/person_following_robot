@@ -1,0 +1,23 @@
+{
+  "package_name": "person_following_robot",
+  "output_dir": "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_typesupport_introspection_cpp/person_following_robot",
+  "template_dir": "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource",
+  "idl_tuples": [
+    "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_adapter/person_following_robot:msg/Object.idl",
+    "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_adapter/person_following_robot:msg/ObjectList.idl",
+    "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_adapter/person_following_robot:msg/TrackedObject.idl"
+  ],
+  "target_dependencies": [
+    "/opt/ros/foxy/lib/rosidl_typesupport_introspection_cpp/rosidl_typesupport_introspection_cpp",
+    "/opt/ros/foxy/lib/python3.8/site-packages/rosidl_typesupport_introspection_cpp/__init__.py",
+    "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource/idl__rosidl_typesupport_introspection_cpp.hpp.em",
+    "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource/idl__type_support.cpp.em",
+    "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource/msg__rosidl_typesupport_introspection_cpp.hpp.em",
+    "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource/msg__type_support.cpp.em",
+    "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource/srv__rosidl_typesupport_introspection_cpp.hpp.em",
+    "/opt/ros/foxy/share/rosidl_typesupport_introspection_cpp/resource/srv__type_support.cpp.em",
+    "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_adapter/person_following_robot/msg/Object.idl",
+    "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_adapter/person_following_robot/msg/ObjectList.idl",
+    "/home/malika/foxy_ws/src/person_following_robot/build/rosidl_adapter/person_following_robot/msg/TrackedObject.idl"
+  ]
+}

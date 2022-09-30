@@ -1,0 +1,4 @@
+source;share/person_following_robot/environment/ament_prefix_path.sh
+source;share/person_following_robot/environment/library_path.sh
+source;share/person_following_robot/environment/path.sh
+source;share/person_following_robot/environment/pythonpath.sh
