@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from turtle import pos
 import rclpy
 from rclpy.node import Node
 from person_following_robot.msg import ObjectList, TrackedObject
@@ -8,10 +7,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
-import copy
 import pyrealsense2 as rs
-
-
 
 ###########################################################################
 ###########################################################################
@@ -29,7 +25,6 @@ class PersonTracker(Node):
 
     def __init__(self):
         super().__init__('person_tracker')
-       
         ##Subscribers
         #Subscribe to the bounding box values from the person 
         self._subscriber_rec_people_data = self.create_subscription(
@@ -71,24 +66,21 @@ class PersonTracker(Node):
                                                 'tracked_person/image', 
                                                 10)
 
-
-
-
         ## Misc variables
-        self._init_BB=None
-        self._cvbridge=CvBridge()
-        self.robot_stream_colour=None 
-        self.robot_stream_depth=None 
-        self.depth_point_stream_robot=None
-        self.aruco_data={"success":False,"position":[0,0]}
+        self._init_BB = None
+        self._cvbridge = CvBridge()
+        self.robot_stream_colour = None
+        self.robot_stream_depth = None
+        self.depth_point_stream_robot = None
+        self.aruco_data = {"success": False, "position": [0, 0]}
         self._tracker = cv2.TrackerCSRT_create()
-        self._first_frame=True
-        self._yolo_box_received=False
-        self.recognised_people=[]
-        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE) 
-        self.image_size=(480,640)   
+        self._first_frame = True
+        self._yolo_box_received = False
+        self.recognised_people = []
+        cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
+        self.image_size = (480, 640)
         # self.video_out = cv2.VideoWriter('./output.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), 10.0,(640,480))
-        self.stop_record=False
+        self.stop_record = False
    
             
 
@@ -183,17 +175,9 @@ class PersonTracker(Node):
         
         mid_x=int((p1[0]+p2[0])/2)
         mid_y=int((p1[1]+p2[1])/2)
-        valid_frame=True
-
-        if mid_x>=self.image_size[0] or mid_y >= self.image_size[1] or mid_x<=0 or mid_y<=0:
-            valid_frame=False
-
-        position=[0.,0.,0.]
-
-        if (self.robot_stream_depth is not None) and valid_frame:
-            
-            mid_z=self.robot_stream_depth[mid_x,mid_y]            
-            position=[mid_x/1000,mid_y/1000,mid_z/1000]
+        position=[0.,0.,0.]            
+        mid_z=self.robot_stream_depth[mid_y-1,mid_x-1]            
+        position=[mid_x/1000,mid_y/1000,mid_z/1000]
 
             # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
             # self.get_logger().info(f"Received world {position}")      
@@ -218,30 +202,23 @@ class PersonTracker(Node):
         
         '''
         ## TO D0 :
-        ## Get point with min distance in the bounding box
-
-        # self.get_logger().info(f"\n Depth p1: {p1} p2 :{p2}")   
-        pass   
-
-        
+        ## Get point with min distance in the bounding box        
         min_dis=0.
-        valid_frame=True
-        if p2[0]>=self.image_size[0] or p2[1] >= self.image_size[1]:
-            valid_frame=False
-
         position=[0.,0.,0.]
+        # for x in range(p1[0],p2[0]):
+        #     for y in range(p1[1],p2[1]):
+        #         current_dis=self.robot_stream_depth[y-2,x-2]  
+        #         if current_dis<=min_dis:
+        #             min_dis=current_dis
+        #             position[0]=float(x)
+        #             position[1]=float(y)
+        #             position[2]=current_dis
 
-        if valid_frame:
-            for x in range(p1[0],p2[0]):
-                for y in range(p1[1],p2[1]):
-                    current_dis=self.robot_stream_depth[x,y]  
-                    if current_dis<=min_dis:
-                        min_dis=current_dis
-                        position[0]=float(x)
-                        position[1]=float(y)
-                        position[2]=current_dis
-
-      
+        depth_list=[self.robot_stream_depth[y-1,x-1] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
+        self.get_logger().info(f"Filtered depth {depth_list[3]}")
+        # new_depth_list=np.asarray(self.remove_outliers(depth_list))
+        # average=np.average(new_depth_list)
+        # self.get_logger().info(f"Filtered depth {average}")
 
 
         return position
@@ -291,28 +268,15 @@ class PersonTracker(Node):
         if (not self._first_frame) and (self._yolo_box_received):  
             ret,bbox = self._tracker.update(self.robot_stream_colour)
             if ret:
-                ##Sending the mid point of the bound box to get position function 
-                
+                ##Sending the mid point of the bound box to get position function
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
                 cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
-                # self.get_logger().info(f"\n trackershape: {self.robot_stream_colour.shape} rec: p1: {p1}p2 :{p2}")
-                position=self.get_position_2(p1,p2)
-                ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
-                ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
-                                    # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                if np.isclose(np.sum(position),.0,1e-3):
-                    print_pos="Tracking invalid"
-                else:
-                    print_pos="Depth: "+str(position[2])+"m"
-                    # cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
-
-
-                # cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
-                #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                
+                position=self.get_position(p1,p2)         
+                _=self.get_position_2(p1,p2)         
+                print_pos="Depth: "+str(position[2])+"m"
+                cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
                 self.publisher_tracked_person_data.publish(track_person_data)
  
@@ -326,30 +290,12 @@ class PersonTracker(Node):
                 leader_sucess,l_bb_box=self.check_leader()
                 if leader_sucess:
                     self._init_BB=l_bb_box
-                    ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
-                    ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                    # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                    # cv2.putText(self.robot_stream_colour, "Re-init BB", ip1, 
-                                        # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                     self._tracker.init(self.robot_stream_colour,l_bb_box)
 
-        # if not self.stop_record:
-        #     self.video_out.write(self.robot_stream_colour)
-        #     self.get_logger().error(f"Still of video")
+
         cv2.imshow("Tracking",self.robot_stream_colour)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     self.get_logger().error(f"End of video")
-        #     self.stop_record=True
-        #     self.video_out.release()
         self.publisher_tracked_person_image.publish(self._cvbridge.cv2_to_imgmsg(self.robot_stream_colour))
-
-
-
-        
         cv2.waitKey(1)
-
-
-
 
 def main(args=None):
     rclpy.logging._root_logger.log(
