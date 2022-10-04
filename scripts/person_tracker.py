@@ -86,7 +86,10 @@ class PersonTracker(Node):
         self._yolo_box_received=False
         self.recognised_people=[]
         cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE) 
-        self.image_size=(480,640)      
+        self.image_size=(480,640)   
+        # self.video_out = cv2.VideoWriter('./output.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), 10.0,(640,480))
+        self.stop_record=False
+   
             
 
     def rec_people_data_callback(self,msg):
@@ -108,9 +111,7 @@ class PersonTracker(Node):
         Subscribe to the image and conver from ROS image messgae 
         and convert to RGB format 
         '''
-        # self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
-        self.robot_stream_colour=self._cvbridge.imgmsg_to_cv2(msg)
-
+        self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)
         self.track_object()
 
     def camera_image_depth_callback(self,msg):
@@ -278,13 +279,14 @@ class PersonTracker(Node):
         Tracks the object
         '''
         ## Intialise the tracker only if first RGB frame is received and the aruco marker is received
-        if (self._first_frame): 
-            ## Check if bounding box inside a leader 
+        if (self._first_frame) and (self._yolo_box_received): 
+            # Check if bounding box inside a leader 
             leader_sucess,l_bb_box=self.check_leader()
             if leader_sucess:
-                self._init_BB=l_bb_box
+                self._init_BB=l_bb_box    
                 self._tracker.init(self.robot_stream_colour,l_bb_box)
                 self._first_frame=False
+
 
         if (not self._first_frame) and (self._yolo_box_received):  
             ret,bbox = self._tracker.update(self.robot_stream_colour)
@@ -294,7 +296,7 @@ class PersonTracker(Node):
                 p1 = (int(bbox[0]), int(bbox[1]))
                 p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
                 cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
-                self.get_logger().info(f"\n trackershape: {self.robot_stream_colour.shape} rec: p1: {p1}p2 :{p2}")
+                # self.get_logger().info(f"\n trackershape: {self.robot_stream_colour.shape} rec: p1: {p1}p2 :{p2}")
                 position=self.get_position_2(p1,p2)
                 ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
                 ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
@@ -308,8 +310,8 @@ class PersonTracker(Node):
                     # cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
 
 
-                cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                # cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
+                #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                 
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
                 self.publisher_tracked_person_data.publish(track_person_data)
@@ -330,8 +332,20 @@ class PersonTracker(Node):
                     # cv2.putText(self.robot_stream_colour, "Re-init BB", ip1, 
                                         # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
                     self._tracker.init(self.robot_stream_colour,l_bb_box)
-        self.publisher_tracked_person_image.publish(self._cvbridge.cv2_to_imgmsg(self.robot_stream_colour))
+
+        # if not self.stop_record:
+        #     self.video_out.write(self.robot_stream_colour)
+        #     self.get_logger().error(f"Still of video")
         cv2.imshow("Tracking",self.robot_stream_colour)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     self.get_logger().error(f"End of video")
+        #     self.stop_record=True
+        #     self.video_out.release()
+        self.publisher_tracked_person_image.publish(self._cvbridge.cv2_to_imgmsg(self.robot_stream_colour))
+
+
+
+        
         cv2.waitKey(1)
 
 

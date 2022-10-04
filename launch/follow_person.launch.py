@@ -55,7 +55,7 @@ def generate_launch_description():
 
     )
 
-    person_tracker=TimerAction(period=8.0,actions=[Node(
+    person_tracker=TimerAction(period=5.0,actions=[Node(
         package="person_following_robot",
         executable="person_tracker.py",
         namespace="person_following_robot"
