@@ -8,6 +8,10 @@ from cv_bridge import CvBridge
 import cv2
 import numpy as np
 import pyrealsense2 as rs
+import sort as st 
+
+
+
 
 ###########################################################################
 ###########################################################################
@@ -78,9 +82,8 @@ class PersonTracker(Node):
         self._yolo_box_received = False
         self.recognised_people = []
         cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
-        self.image_size = (480, 640)
+        # self.image_size = (480, 640)
         # self.video_out = cv2.VideoWriter('./output.mp4', cv2.VideoWriter_fourcc('M','J','P','G'), 10.0,(640,480))
-        self.stop_record = False
    
             
 
@@ -203,19 +206,26 @@ class PersonTracker(Node):
         '''
         ## TO D0 :
         ## Get point with min distance in the bounding box        
-        min_dis=0.
         position=[0.,0.,0.]
-        # for x in range(p1[0],p2[0]):
-        #     for y in range(p1[1],p2[1]):
-        #         current_dis=self.robot_stream_depth[y-2,x-2]  
-        #         if current_dis<=min_dis:
-        #             min_dis=current_dis
-        #             position[0]=float(x)
-        #             position[1]=float(y)
-        #             position[2]=current_dis
+        # depth_list_index=[self.robot_stream_depth[y-1,x-1] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
+        self.get_logger().info(f" \n Depth shape {self.robot_stream_depth.shape}")
 
-        depth_list=[self.robot_stream_depth[y-1,x-1] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
-        self.get_logger().info(f"Filtered depth {depth_list[3]}")
+        self.get_logger().info(f" \n Points x range {p1[0]}-{p2[0]} y range {p1[1]}-{p2[1]}")
+
+        # depth_list=[self.robot_stream_depth[y,x] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
+
+        
+        for x in range(p1[0],p2[0]):
+            for y in range(p1[1],p2[1]):
+                self.get_logger().debug(f" \n Current iter  y {y} x {x}")
+                depth=self.robot_stream_depth[y,x]
+
+
+            
+
+        # depth_list_index=[(y,x) for y in range(p1[0],p2[0]) for x in range(p1[1],p2[1])]
+
+        # self.get_logger().info(f"Filtered depth {depth_list[3]}")
         # new_depth_list=np.asarray(self.remove_outliers(depth_list))
         # average=np.average(new_depth_list)
         # self.get_logger().info(f"Filtered depth {average}")
