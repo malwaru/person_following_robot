@@ -56,6 +56,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/yolo_infer.py
   scripts/person_tracker.py
+  scripts/person_tracker_sort.py
   scripts/webcam_publisher.py
   scripts/tf_static_transformer.py
   scripts/aruco_detector.py
