@@ -8,7 +8,6 @@ from cv_bridge import CvBridge
 import cv2
 import numpy as np
 import pyrealsense2 as rs
-import sort as st 
 
 
 
