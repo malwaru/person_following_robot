@@ -3,7 +3,7 @@
 ROS2 package made to recognize, track and follow a human. 
 
 The person recognition is based on the work done by [1] original repository can be found at https://github.com/meituan/yolov6 
-This package is intended for a robot to recognize, track and follow a human. 
+The tracking is done by the sort [2] original code available at https://github.com/abewley/sort
 
 ## Installation
 Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
@@ -51,5 +51,6 @@ If you have run out of energy or time for your project, put a note at the top of
 ## References
 
 [1] C. Li et al., “YOLOv6: A Single-Stage Object Detection Framework for Industrial Applications.” arXiv, 2022. doi: 10.48550/ARXIV.2209.02976.
+[2] A. Bewley, Z. Ge, L. Ott, F. Ramos, and B. Upcroft, “Simple online and realtime tracking,” in 2016 IEEE International Conference on Image Processing (ICIP), 2016, pp. 3464–3468.
 
 
