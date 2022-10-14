@@ -9,6 +9,7 @@ from person_following_robot.msg import ObjectList, TrackedObject
 import cv2
 from sort import Sort 
 import numpy as np
+import pyrealsense2 as rs
 
 
 class SortTracker(Node):
