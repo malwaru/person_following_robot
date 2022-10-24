@@ -72,7 +72,7 @@ def generate_launch_description():
     ld.add_action(tf_broadcaster)
     ld.add_action(aruco_detector)
     ld.add_action(yolo_infer)
-    # ld.add_action(person_tracker)
+    ld.add_action(person_tracker)
 
 
 
