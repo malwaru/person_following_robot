@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from select import select
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -10,6 +9,9 @@ import cv2
 from sort import Sort 
 import numpy as np
 import pyrealsense2 as rs
+import copy
+from scipy import stats as st
+
 
 
 class SortTracker(Node):
@@ -81,7 +83,9 @@ class SortTracker(Node):
         Call back function for camera depth and decode
         using passthrough
         '''
-        self.robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+        robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+        ## The scale of depth pixels is 0.001|  16bit depth, one unit is 1 mm, 
+        self.robot_stream_depth = np.array(robot_stream_depth, dtype=np.uint16)*0.001
 
 
     def aruco_data_callback(self,msg):
@@ -115,7 +119,7 @@ class SortTracker(Node):
         bbox=[]    
         #Check if tracking was successfull
         if len(tracked_people)>0:            
-            ## If the the leader unknown aruco is available
+            ## If the leader is unknown and aruco is available
             if (not self.leader_found) and (self.aruco_data["success"]==True): 
                 aruco_center=[int(self.aruco_data["position"][0]),int(self.aruco_data["position"][1])]
                 # aruco marker is found
@@ -149,6 +153,77 @@ class SortTracker(Node):
 
 
 
+    # def get_position(self,p1,p2):
+    #     '''Get the distance to the person 
+    #        Removes outliers and get the average distance to 
+    #        the mid point of the bounding box
+
+    #        Params:
+    #        --------
+    #        p1 : Top left corner of bounding box
+    #        p2 : Bottom right corner of bounding box
+
+    #        Returns:
+    #        -------
+    #        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
+           
+        
+    #     '''
+    #     ## TO D0 :
+    #     ## Get point with min distance in the bounding box        
+    #     position=[0.,0.,0.]
+    #     # depth_list=[self.robot_stream_depth[y,x] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
+    #     depth_list=[]
+    #     for x in range(p1[0],p2[0]):
+    #          for y in range(p1[1],p2[1]):
+    #             try:
+    #                 depth_list.append(self.robot_stream_depth[x,y])
+    #             except:
+    #                 pass
+
+
+    #     depth_list=np.asarray(depth_list)
+    #     new_depth_list=self.remove_outliers(depth_list)
+    #     mean_depth=np.mean(new_depth_list)
+    #     position[2]=np.round(mean_depth,2)
+    #     # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
+    #     return position
+
+
+
+    def get_position_2(self,p1,p2):
+        '''Get the distance to the person 
+        Removes outliers and get the average distance to 
+        the mid point of the bounding box
+
+        Params:
+        --------
+        p1 : Top left corner of bounding box
+        p2 : Bottom right corner of bounding box
+
+        Returns:
+        -------
+        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
+        
+        
+        '''
+        ## TO D0 :
+        ## Get point with min distance in the bounding box        
+        w= (self.robot_stream_depth.shape)[0]
+        l= (self.robot_stream_depth.shape)[1]
+        x1=np.clip(p1[0],0,w-1)
+        x2=np.clip(p2[0],0,w-1)
+        y1=np.clip(p1[1],0,l-1)
+        y2=np.clip(p2[1],0,l-1)
+        x= int((x1+x2)/2)
+        y= int((y1+y2)/2)       
+        depth=self.robot_stream_depth[y,x]             
+        # position2=rs.rs2_deproject_pixel_to_point([float(x),float(y)],float(depth))
+        position=[x,y,np.round(depth,2)]
+
+
+        return position
+
     def get_position(self,p1,p2):
         '''Get the distance to the person 
            Removes outliers and get the average distance to 
@@ -166,29 +241,49 @@ class SortTracker(Node):
         
         '''
         ## TO D0 :
-        ## Get point with min distance in the bounding box        
-        position=[0.,0.,0.]
-        # depth_list=[self.robot_stream_depth[y,x] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
 
         depth_list=[]
-        for x in range(p1[0],p2[0]):
-             for y in range(p1[1],p2[1]):
-                try:
-                    depth_list.append(self.robot_stream_depth[x,y])
-                except:
-                    pass
-
-
+        w= (self.robot_stream_depth.shape)[0]
+        l= (self.robot_stream_depth.shape)[1]
+        x1=np.clip(p1[0],0,w-1)
+        x2=np.clip(p2[0],0,w-1)
+        y1=np.clip(p1[1],0,l-1)
+        y2=np.clip(p2[1],0,l-1)
+        depth_list=[self.robot_stream_depth[x,y] for x in range(x1,x2) for y in range(y1,y2)]
         depth_list=np.asarray(depth_list)
-        new_depth_list=self.remove_outliers(depth_list)
+        depth_copy_list=copy.deepcopy(depth_list)
+        new_depth_list=self.remove_outliers(depth_copy_list)
         mean_depth=np.mean(new_depth_list)
-        position[2]=np.round(mean_depth/1000,2)
+        # mean_depth=st.mode(new_depth_list)
+        # self.get_logger().info(f"Mode depth {mean_depth} ")
+        depth=mean_depth
+        depth_point=self.closest_point(depth,(x1,x2,y1,y2))
+        self.get_logger().info(f"depth point {depth_point} ")
+        position=[depth_point[0],depth_point[1],depth]
         # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
 
 
         return position
 
+    def closest_point(self,depth,corners):
+        '''
+        
+        '''
+        min_dis=np.Inf
+        x0=corners[0]
+        y0=corners[2]
+        for x in range(corners[0],corners[1]):
+            for y in range(corners[2],corners[3]):
+                current_depth=-self.robot_stream_depth[x,y]
+                if abs(depth-current_depth)<min_dis:
+                    x0=x
+                    y0=y
+                    min_dis=abs(depth-current_depth)
 
+
+
+
+        return (x0,y0)
 
     def remove_outliers(self,data, pp1 = 0.01, pp2 = 0.001) -> np.array:
         '''
@@ -217,6 +312,7 @@ class SortTracker(Node):
         
         return final_data
 
+
     def track_object(self):
         '''
         Tracks the object
@@ -227,16 +323,67 @@ class SortTracker(Node):
 
         if  self.leader_found and len(track_bbox)>0:        
             cv2.rectangle(self.robot_stream_colour, track_bbox[0], track_bbox[1], (255,0,0), 2, 1)
-            depth=self.get_position(track_bbox[0], track_bbox[1])
-            print_pos=str(depth[2])+" m"
+            pos=self.get_position(track_bbox[0], track_bbox[1])
+            print_pos=str(pos[2])+" m"
             cv2.putText(self.robot_stream_colour, print_pos, (track_bbox[0][0]+10,track_bbox[0][1]),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+            cv2.circle(self.robot_stream_colour, (pos[0],pos[1]), 5, (255, 0, 0), 2)
+            
         else:
             cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+
         cv2.imshow("Tracking",self.robot_stream_colour)
+        # self.debug_test()     
         cv2.waitKey(1) 
 
+    def debug_test(self):
+        '''
+        Here we add test scipts
+
+        '''
+
+        
+
+        # try:
+
+        #     # mean_depth=np.mean(self.robot_stream_depth)
+
+        #     # max_depth=np.max(self.robot_stream_depth)
+        #     # min_depth=np.minimum(self.robot_stream_depth)
+        #     shape_depth=(self.robot_stream_depth).shape
+
+        #     self.get_logger().info(f"Debug :  {shape_depth}")
+        #     # temp_dp=np.zeros((512,512,3), np.uint8)
+        # except:
+        #     pass
+
+        # try:
+        #     cv2.imshow("Depth",self.robot_stream_depth)
+
+        # except:
+        #     pass
+
+        # try:
+
+        #     max_depth=np.max(self.robot_stream_depth)
+        #     self.get_logger().info(f"Debug  \n max depth:  {max_depth}")
+
+        # except:
+        #     pass
+
+
+
+        # try:
+
+        #     max_depth=np.min(self.robot_stream_depth)
+        #     self.get_logger().info(f"\n min depth:  {max_depth}")
+
+        # except:
+        #     pass
+
+   
+        
 
     
 

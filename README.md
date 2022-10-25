@@ -25,7 +25,9 @@ For both packages they have to be installed as a python package to do this
 
 ### Note  
 Get the YOLOv6 weights from and add to a folder weights 
-wget -O yolov6n.pt https://raw.githubusercontent.com/meituan/YOLOv6/releases/download/0.2.0/yolov6n.
+```
+ wget -O yolov6n.pt https://raw.githubusercontent.com/meituan/YOLOv6/releases/download/0.2.0/yolov6n 
+ ```
 
 ## Quick start
 
