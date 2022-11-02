@@ -11,7 +11,7 @@ import numpy as np
 import pyrealsense2 as rs
 import copy
 from scipy import stats as st
-
+import matplotlib.pyplot as plt
 
 
 class SortTracker(Node):
@@ -55,6 +55,24 @@ class SortTracker(Node):
         self.aruco_data = {"success": False, "position": [0, 0]}
         self.recognised_people = np.empty((0, 5))
         cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
+
+        ## 
+        self.figure1=plt.figure()
+        self.ax1=self.figure1.add_subplot(111)
+        self.ax1.set(title="Depth_distribution",xlabel="Points",ylabel="Depth(m)")
+
+        ## Pyrealsense
+        self.depth_intrinsic = rs.pyrealsense2.intrinsics()
+        self.depth_intrinsic.width = 424
+        self.depth_intrinsic.height = 240
+        self.depth_intrinsic.ppx = 213.47621154785156
+        self.depth_intrinsic.ppy = 121.29695892333984
+        self.depth_intrinsic.fx = 306.0126953125
+        self.depth_intrinsic.fy = 306.1602783203125
+        self.depth_intrinsic.model = rs.pyrealsense2.distortion.inverse_brown_conrady
+        self.depth_intrinsic.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+
 
 
 
@@ -151,79 +169,6 @@ class SortTracker(Node):
 
         return bbox
 
-
-
-    # def get_position(self,p1,p2):
-    #     '''Get the distance to the person 
-    #        Removes outliers and get the average distance to 
-    #        the mid point of the bounding box
-
-    #        Params:
-    #        --------
-    #        p1 : Top left corner of bounding box
-    #        p2 : Bottom right corner of bounding box
-
-    #        Returns:
-    #        -------
-    #        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
-           
-        
-    #     '''
-    #     ## TO D0 :
-    #     ## Get point with min distance in the bounding box        
-    #     position=[0.,0.,0.]
-    #     # depth_list=[self.robot_stream_depth[y,x] for x in range(p1[0],p2[0]) for y in range(p1[1],p2[1])]
-    #     depth_list=[]
-    #     for x in range(p1[0],p2[0]):
-    #          for y in range(p1[1],p2[1]):
-    #             try:
-    #                 depth_list.append(self.robot_stream_depth[x,y])
-    #             except:
-    #                 pass
-
-
-    #     depth_list=np.asarray(depth_list)
-    #     new_depth_list=self.remove_outliers(depth_list)
-    #     mean_depth=np.mean(new_depth_list)
-    #     position[2]=np.round(mean_depth,2)
-    #     # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
-    #     return position
-
-
-
-    def get_position_2(self,p1,p2):
-        '''Get the distance to the person 
-        Removes outliers and get the average distance to 
-        the mid point of the bounding box
-
-        Params:
-        --------
-        p1 : Top left corner of bounding box
-        p2 : Bottom right corner of bounding box
-
-        Returns:
-        -------
-        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
-        
-        
-        '''
-        ## TO D0 :
-        ## Get point with min distance in the bounding box        
-        w= (self.robot_stream_depth.shape)[0]
-        l= (self.robot_stream_depth.shape)[1]
-        x1=np.clip(p1[0],0,w-1)
-        x2=np.clip(p2[0],0,w-1)
-        y1=np.clip(p1[1],0,l-1)
-        y2=np.clip(p2[1],0,l-1)
-        x= int((x1+x2)/2)
-        y= int((y1+y2)/2)       
-        depth=self.robot_stream_depth[y,x]             
-        # position2=rs.rs2_deproject_pixel_to_point([float(x),float(y)],float(depth))
-        position=[x,y,np.round(depth,2)]
-
-
-        return position
-
     def get_position(self,p1,p2):
         '''Get the distance to the person 
            Removes outliers and get the average distance to 
@@ -251,6 +196,12 @@ class SortTracker(Node):
         y2=np.clip(p2[1],0,l-1)
         depth_list=[self.robot_stream_depth[x,y] for x in range(x1,x2) for y in range(y1,y2)]
         depth_list=np.asarray(depth_list)
+        ##
+        self.ax1.cla()
+        self.ax1.scatter(range(len(depth_list)),depth_list)
+        plt.pause(0.001)
+
+
         depth_copy_list=copy.deepcopy(depth_list)
         new_depth_list=self.remove_outliers(depth_copy_list)
         mean_depth=np.mean(new_depth_list)
@@ -258,7 +209,7 @@ class SortTracker(Node):
         # self.get_logger().info(f"Mode depth {mean_depth} ")
         depth=mean_depth
         depth_point=self.closest_point(depth,(x1,x2,y1,y2))
-        self.get_logger().info(f"depth point {depth_point} ")
+        # self.get_logger().info(f"depth point {depth_point} ")
         position=[depth_point[0],depth_point[1],depth]
         # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
 
@@ -267,7 +218,7 @@ class SortTracker(Node):
 
     def closest_point(self,depth,corners):
         '''
-        
+        Find the index point that the depth value is closest to
         '''
         min_dis=np.Inf
         x0=corners[0]
@@ -313,6 +264,42 @@ class SortTracker(Node):
         return final_data
 
 
+    def get_position_2(self,p1,p2):
+        '''Get the distance to the person 
+        Removes outliers and get the average distance to 
+        the mid point of the bounding box
+
+        Params:
+        --------
+        p1 : Top left corner of bounding box
+        p2 : Bottom right corner of bounding box
+
+        Returns:
+        -------
+        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
+        
+        
+        '''
+        ## TO D0 :
+        ## Get point with min distance in the bounding box        
+        w= (self.robot_stream_depth.shape)[0]
+        l= (self.robot_stream_depth.shape)[1]
+        x1=np.clip(p1[0],0,w-1)
+        x2=np.clip(p2[0],0,w-1)
+        y1=np.clip(p1[1],0,l-1)
+        y2=np.clip(p2[1],0,l-1)
+        x= int((x1+x2)/2)
+        y= int((y1+y2)/2)       
+        depth=self.robot_stream_depth[y,x]             
+        pixel_point=[float(x),float(y)]
+        position2=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
+        self.get_logger().info(f"Positio {position2}")
+        position=[x,y,np.round(depth,2)]
+
+
+        return position
+
+
     def track_object(self):
         '''
         Tracks the object
@@ -342,52 +329,13 @@ class SortTracker(Node):
         Here we add test scipts
 
         '''
-
         
 
-        # try:
+        try:
+            cv2.imshow("Depth",self.robot_stream_depth)
 
-        #     # mean_depth=np.mean(self.robot_stream_depth)
-
-        #     # max_depth=np.max(self.robot_stream_depth)
-        #     # min_depth=np.minimum(self.robot_stream_depth)
-        #     shape_depth=(self.robot_stream_depth).shape
-
-        #     self.get_logger().info(f"Debug :  {shape_depth}")
-        #     # temp_dp=np.zeros((512,512,3), np.uint8)
-        # except:
-        #     pass
-
-        # try:
-        #     cv2.imshow("Depth",self.robot_stream_depth)
-
-        # except:
-        #     pass
-
-        # try:
-
-        #     max_depth=np.max(self.robot_stream_depth)
-        #     self.get_logger().info(f"Debug  \n max depth:  {max_depth}")
-
-        # except:
-        #     pass
-
-
-
-        # try:
-
-        #     max_depth=np.min(self.robot_stream_depth)
-        #     self.get_logger().info(f"\n min depth:  {max_depth}")
-
-        # except:
-        #     pass
-
-   
-        
-
-    
-
-
+        except:
+            pass
 
 
 def main(args=None):

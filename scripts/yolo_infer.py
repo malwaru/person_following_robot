@@ -40,9 +40,7 @@ ROOT = os.path.abspath(os.path.join(ROOT, '../src/YOLOv6/'))
 ###########################################################################
 ## TO DO:
 ## 1. Get path to weightd from ROS pack find instead of os.path.abspath
-## 2. Handle multiple people  and detections in the video
-## 3. Choose better function and variable names eg : listener_callback
-## 4. Stop Yolo when tracker is success and start when it fails
+## 3. Choose better function and variable names eg : listener_callback 
 #############################################################################
 #############################################################################
 #############################################################################
