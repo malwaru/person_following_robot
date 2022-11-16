@@ -1,37 +1,24 @@
 #!/usr/bin/env python3
-from turtle import pos
 import rclpy
 from rclpy.node import Node
-from person_following_robot.msg import ObjectList, TrackedObject
-from rclpy.logging import LoggingSeverity
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+from cv_bridge import CvBridge 
+from rclpy.logging import LoggingSeverity
+from person_following_robot.msg import ObjectList, TrackedObject
 import cv2
+from sort import Sort 
 import numpy as np
-import copy
 import pyrealsense2 as rs
+import copy
+from scipy import stats as st
+import matplotlib.pyplot as plt
 
 
+class SortTracker(Node):
 
-###########################################################################
-###########################################################################
-###########################################################################
-## TO DO:
-## 1. Use the XYZ to find world coordinates
-## 2. Use a gaussian filter to cut out the anamolies and get average depth 
-##
-#############################################################################
-#############################################################################
-#############################################################################
-
-
-class PersonTracker(Node):
-
-    def __init__(self):
+    def __init__(self, device=0):
         super().__init__('person_tracker')
-       
-        ##Subscribers
-        #Subscribe to the bounding box values from the person 
+
         self._subscriber_rec_people_data = self.create_subscription(
                                                 ObjectList,
                                                 '/person_following_robot/recognised_people/data',
@@ -54,70 +41,70 @@ class PersonTracker(Node):
         self._subscriber_camera_image_depth  
 
         self._subscriber_aruco_data = self.create_subscription(
-                                                TrackedObject,
-                                                '/person_following_robot/aruco_data',
-                                                self.aruco_data_callback,
-                                                10)
+                                        TrackedObject,
+                                        '/person_following_robot/aruco_data',
+                                        self.aruco_data_callback,
+                                        10)
         self._subscriber_aruco_data 
+        # Other variables
+        self._cvbridge = CvBridge()
+        self.robot_stream_colour = None
+        self._tracker = Sort(max_age=5,min_hits=3,iou_threshold=0.3)
+        self.leader_found=False
+        self.tracked_idx=-1
+        self.aruco_data = {"success": False, "position": [0, 0]}
+        self.recognised_people = np.empty((0, 5))
+        cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
+
+        ## 
+        self.figure1=plt.figure()
+        self.ax1=self.figure1.add_subplot(111)
+        self.ax1.set(title="Depth_distribution",xlabel="Points",ylabel="Depth(m)")
+
+        ## Pyrealsense
+        self.depth_intrinsic = rs.pyrealsense2.intrinsics()
+        self.depth_intrinsic.width = 424
+        self.depth_intrinsic.height = 240
+        self.depth_intrinsic.ppx = 213.47621154785156
+        self.depth_intrinsic.ppy = 121.29695892333984
+        self.depth_intrinsic.fx = 306.0126953125
+        self.depth_intrinsic.fy = 306.1602783203125
+        self.depth_intrinsic.model = rs.pyrealsense2.distortion.inverse_brown_conrady
+        self.depth_intrinsic.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
 
 
-        # Publisher to pubsish person depth
-        self.publisher_tracked_person_data = self.create_publisher(
-                                                TrackedObject,
-                                                'tracked_person/data', 
-                                                10)
-        self.publisher_tracked_person_image = self.create_publisher(
-                                                Image,
-                                                'tracked_person/image', 
-                                                10)
 
 
-
-
-        ## Misc variables
-        self._init_BB=None
-        self._cvbridge=CvBridge()
-        self.robot_stream_colour=None 
-        self.robot_stream_depth=None 
-        self.depth_point_stream_robot=None
-        self.aruco_data={"success":False,"position":[0,0]}
-        self._tracker = cv2.TrackerCSRT_create()
-        # self._tracker = cv2.TrackerMOSSE_create()
-        self._first_frame=True
-        self._yolo_box_received=False
-        self.recognised_people=[]
-        cv2.namedWindow("Tracking",cv2.WINDOW_AUTOSIZE) 
-        self.image_size=(480,640)      
-            
 
     def rec_people_data_callback(self,msg):
         '''
         Subcribe to the messga and output the bouding box in the format 
         coordintate of top left corner width and height     
         '''
-        for obj in msg.objects:
-            w=int(obj.bounding_box[2]-obj.bounding_box[0])
-            l=int(obj.bounding_box[3]-obj.bounding_box[1])
-            x=int(obj.bounding_box[0])
-            y=int(obj.bounding_box[1])
-            self.recognised_people=[[obj.database_id,[x,y,w,l]]]
-        self._yolo_box_received=True
-        
+        self.recognised_people=[]
+        for obj in msg.objects:        
+            self.recognised_people.append([obj.bounding_box[0],obj.bounding_box[1],obj.bounding_box[2],obj.bounding_box[3],obj.probability])
+        self.recognised_people=np.array(self.recognised_people)
+             
 
     def camera_image_raw_callback(self,msg):
         '''
         Subscribe to the image and conver from ROS image messgae 
         and convert to RGB format 
         '''
-        self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)    
+        self.robot_stream_colour=cv2.cvtColor(self._cvbridge.imgmsg_to_cv2(msg) ,cv2.COLOR_BGR2RGB)
         self.track_object()
+
 
     def camera_image_depth_callback(self,msg):
         '''
         Call back function for camera depth and decode
         using passthrough
         '''
-        self.robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+        robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+        ## The scale of depth pixels is 0.001|  16bit depth, one unit is 1 mm, 
+        self.robot_stream_depth = np.array(robot_stream_depth, dtype=np.uint16)*0.001
+
 
     def aruco_data_callback(self,msg):
         '''
@@ -131,10 +118,14 @@ class PersonTracker(Node):
         msg.position: position on the frame 
         
         '''
-        self.aruco_data["success"]=msg.success
-        self.aruco_data["position"]=msg.position
+        if msg.success==True:
+            self.aruco_received=True
 
-    def check_leader(self):
+        self.aruco_data["success"]=msg.success
+        self.aruco_data["position"]=msg.position  
+
+   
+    def check_leader(self,tracked_people):
         '''
         Check if the people in the bounding box is also marked with an 
         aruco marker a leader
@@ -142,51 +133,41 @@ class PersonTracker(Node):
         Returns
         --------
         If Leader was found and the bounding box
-        '''
-        leader_status=False
-        bounding_box=[]  
-        if self.aruco_data["success"]==True:
-            aruco_center=[int(self.aruco_data["position"][0]),int(self.aruco_data["position"][1])]
-            for person in self.recognised_people:
-                x=person[1][0]
-                y=person[1][1]
-                w=person[1][2]
-                l=person[1][3]
-                if (aruco_center[0]>=x) and (aruco_center[0]<=x+w) and (aruco_center[1]>=y) and (aruco_center[1]<=y+l):
-                    bounding_box=person[1]
-                    leader_status=True
-        return leader_status,bounding_box
+        '''    
+        bbox=[]    
+        #Check if tracking was successfull
+        if len(tracked_people)>0:            
+            ## If the leader is unknown and aruco is available
+            if (not self.leader_found) and (self.aruco_data["success"]==True): 
+                aruco_center=[int(self.aruco_data["position"][0]),int(self.aruco_data["position"][1])]
+                # aruco marker is found
+                for person in tracked_people:
+                    x1=int(person[0])
+                    y1=int(person[1])
+                    x2=int(person[2])
+                    y2=int(person[3])                
+                    if (aruco_center[0]>=x1) and (aruco_center[0]<=x2) and (aruco_center[1]>=y1) and (aruco_center[1]<=y2):
+                        self.leader_found=True
+                        bbox=((x1,y1),(x2,y2))   
+                        self.tracked_idx=person[4]
+            ## If tracked index is available in the current index
+            else:
+                ##This make sure if occulusion changed idx ,the person can still be tracked 
+                self.leader_found=False
+                for person in tracked_people:
+                    x1=int(person[0])
+                    y1=int(person[1])
+                    x2=int(person[2])
+                    y2=int(person[3])
+                    if person[4]==self.tracked_idx :
+                        self.leader_found=True 
+                        bbox=[(x1,y1),(x2,y2)]       
 
+        else:
+            self.leader_found=False
+            self.tracked_idx=-1
 
-
-    def getXYZ(self,x,y):
-        '''
-        https://pastebin.com/i71RQcU2
-        https://github.com/stereolabs/zed-ros-wrapper/issues/370
-        '''
-
-        width = self.depth_point_stream_robot.width
-        height = self.depth_point_stream_robot.height
-
-        u=int(x/width)
-        v=int(y/height)
-        
-
-        # // Convert from u (column / width), v (row/height) to position in array
-        # // where X,Y,Z data starts
-        arrayPosition=v*self.depth_point_stream_robot.row_step + u*self.depth_point_stream_robot.point_step
-        arrayPosX = arrayPosition + self.depth_point_stream_robot.fields[0].offset
-        arrayPosY = arrayPosition + self.depth_point_stream_robot.fields[1].offset
-        arrayPosZ = arrayPosition + self.depth_point_stream_robot.fields[2].offset
-        self.get_logger().info(f"\n For x : {x} y: {y} & w: {width}  h:{height} u {u} v{v}\n depth: {len(self.depth_point_stream_robot.data)} x: {arrayPosX} , y:{arrayPosY} , z : {arrayPosZ} \n")
-        X = self.depth_point_stream_robot.data[arrayPosX]
-        Y = self.depth_point_stream_robot.data[arrayPosY]
-        Z = self.depth_point_stream_robot.data[arrayPosZ]
-
-
-
-        return [X,Y,Z]
-
+        return bbox
 
     def get_position(self,p1,p2):
         '''Get the distance to the person 
@@ -205,54 +186,65 @@ class PersonTracker(Node):
         
         '''
         ## TO D0 :
-        ## Get the outlier removed when finding the average mid point
-        ## Find a scale invariant method of geting list of point of the bounding box mid  
-        #   
-        
-        mid_x=int((p1[0]+p2[0])/2)
-        mid_y=int((p1[1]+p2[1])/2)
-        valid_frame=True
 
-        if mid_x>=self.image_size[0] or mid_y >= self.image_size[1] or mid_x<=0 or mid_y<=0:
-            valid_frame=False
-             # point_samples
-        #  self._position_grid=np.array([np.tile(np.arange(mid_x+10,plane_origin_x-grid_size,-grid_size)[:,None],(1,grid_shape_y)),\
-        #                               np.tile(np.arange(plane_origin_y,plane_origin_y-ysize,-grid_size)[:,None].T,(grid_shape_x,1))],dtype=object)
- 
-        #Get most accurate point for depth
+        depth_list=[]
+        w= (self.robot_stream_depth.shape)[0]
+        l= (self.robot_stream_depth.shape)[1]
+        x1=np.clip(p1[0],0,w-1)
+        x2=np.clip(p2[0],0,w-1)
+        y1=np.clip(p1[1],0,l-1)
+        y2=np.clip(p2[1],0,l-1)
+        depth_list=[self.robot_stream_depth[x,y] for x in range(x1,x2) for y in range(y1,y2)]
+        depth_list=np.asarray(depth_list)
+        ##
+        self.ax1.cla()
+        self.ax1.scatter(range(len(depth_list)),depth_list)
+        plt.pause(0.001)
 
-        
-        # Depth image size 480, 848
-        # Raw image size 
-        # Get depth implementation using the image data
-        # if self.robot_stream_depth is not None:
-        #     depth = self.robot_stream_depth[400,500]
-        #     # depp=np.asanyarray(depth)
-        #     self.get_logger().info(f"Robot depth x:{mid_x} depth: {depth}")
-        #     track_person_data=TrackedObject(name="Person",id=1,success=True,position=[mid_x,mid_y,depth])
 
-        # Get depth implemenation using the point cloud data
-        position=[0.,0.,0.]
-
-        if (self.robot_stream_depth is not None) and valid_frame:
-            
-            mid_z=self.robot_stream_depth[mid_x,mid_y]            
-            position=[mid_x/1000,mid_y/1000,mid_z/1000]
-            # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
-            # self.get_logger().info(f"Received world {position}")      
+        depth_copy_list=copy.deepcopy(depth_list)
+        new_depth_list=self.remove_outliers(depth_copy_list)
+        mean_depth=np.mean(new_depth_list)
+        # mean_depth=st.mode(new_depth_list)
+        # self.get_logger().info(f"Mode depth {mean_depth} ")
+        depth=mean_depth
+        depth_point=self.closest_point(depth,(x1,x2,y1,y2))
+        # self.get_logger().info(f"depth point {depth_point} ")
+        position=[depth_point[0],depth_point[1],depth]
+        # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
 
 
         return position
 
-    def remove_outliers(data, pp1 = 0.01, pp2 = 0.001) -> np.array:
+    def closest_point(self,depth,corners):
         '''
-        Detect outliers based on Chebychev Theorem
+        Find the index point that the depth value is closest to
+        '''
+        min_dis=np.Inf
+        x0=corners[0]
+        y0=corners[2]
+        for x in range(corners[0],corners[1]):
+            for y in range(corners[2],corners[3]):
+                current_depth=-self.robot_stream_depth[x,y]
+                if abs(depth-current_depth)<min_dis:
+                    x0=x
+                    y0=y
+                    min_dis=abs(depth-current_depth)
+
+
+
+
+        return (x0,y0)
+
+    def remove_outliers(self,data, pp1 = 0.01, pp2 = 0.001) -> np.array:
+        '''
+        Detect and remove outliers based on Chebychev Theorem
         
         Returns
         ---------
         outliers_detected:  Number of outliers detected
-        final_data_indices: Indices for filtered data
-        '''
+        final_data_indices: Indices for filtered data        '''
+
         
         mu1=np.mean(data)
         sigma1=np.var(data)
@@ -272,83 +264,91 @@ class PersonTracker(Node):
         return final_data
 
 
+    def get_position_2(self,p1,p2):
+        '''Get the distance to the person 
+        Removes outliers and get the average distance to 
+        the mid point of the bounding box
+
+        Params:
+        --------
+        p1 : Top left corner of bounding box
+        p2 : Bottom right corner of bounding box
+
+        Returns:
+        -------
+        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
+        
+        
+        '''
+        ## TO D0 :
+        ## Get point with min distance in the bounding box        
+        w= (self.robot_stream_depth.shape)[0]
+        l= (self.robot_stream_depth.shape)[1]
+        x1=np.clip(p1[0],0,w-1)
+        x2=np.clip(p2[0],0,w-1)
+        y1=np.clip(p1[1],0,l-1)
+        y2=np.clip(p2[1],0,l-1)
+        x= int((x1+x2)/2)
+        y= int((y1+y2)/2)       
+        depth=self.robot_stream_depth[y,x]             
+        pixel_point=[float(x),float(y)]
+        position2=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
+        self.get_logger().info(f"Positio {position2}")
+        position=[x,y,np.round(depth,2)]
+
+
+        return position
+
+
     def track_object(self):
         '''
         Tracks the object
         '''
-        ## Intialise the tracker only if first RGB frame is received and the aruco marker is received
-        if (self._first_frame): 
-            ## Check if bounding box inside a leader 
-            leader_sucess,l_bb_box=self.check_leader()
-            if leader_sucess:
-                self._init_BB=l_bb_box
-                self._tracker.init(self.robot_stream_colour,l_bb_box)
-                self._first_frame=False
+    
+        tracked_people=self._tracker.update(self.recognised_people)
+        track_bbox=self.check_leader(tracked_people)
 
-        if (not self._first_frame) and (self._yolo_box_received):  
-            ret,bbox = self._tracker.update(self.robot_stream_colour)
-            if ret:
-                ##Sending the mid point of the bound box to get position function 
-                
-                p1 = (int(bbox[0]), int(bbox[1]))
-                p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                # cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
-                position=self.get_position(p1,p2)
-                ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
-                ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                # cv2.putText(self.robot_stream_colour, "Init BB", ip1, 
-                                    # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                # print_pos="x: "+str(position[0])+"\ny: "+str(position[1])+"\nz: "+str(position[2])
-                # y0, dy = p1[1], 20
-                # for i, line in enumerate(print_pos.split('\n')):
-                #     y = y0 + i*dy
-                #     cv2.putText(self.robot_stream_colour, line, (p1[0]+20, y ), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                if np.isclose(np.sum(position),.0,1e-3):
-                    print_pos="Tracking invalid"
-                else:
-                    # print_pos="x: "+str(position[0])+"  y: "+str(position[1])+"  z: "+str(position[2])
-                    print_pos="Depth: "+str(position[2])+"m"
-                    cv2.rectangle(self.robot_stream_colour, p1, p2, (255,0,0), 2, 1)
-
-
-                cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,0),2)
-                
-                track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
-                self.publisher_tracked_person_data.publish(track_person_data)
- 
-                
-            else:
-                cv2.putText(self.robot_stream_colour, "Tracking failed", (100,80), 
+        if  self.leader_found and len(track_bbox)>0:        
+            cv2.rectangle(self.robot_stream_colour, track_bbox[0], track_bbox[1], (255,0,0), 2, 1)
+            pos=self.get_position(track_bbox[0], track_bbox[1])
+            print_pos=str(pos[2])+" m"
+            cv2.putText(self.robot_stream_colour, print_pos, (track_bbox[0][0]+10,track_bbox[0][1]),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+            cv2.circle(self.robot_stream_colour, (pos[0],pos[1]), 5, (255, 0, 0), 2)
+            
+        else:
+            cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
-                track_person_data=TrackedObject(name="Person",id=1,success=False,position=[])
-                self.publisher_tracked_person_data.publish(track_person_data)
-                ##Reinitate tracker
-                leader_sucess,l_bb_box=self.check_leader()
-                if leader_sucess:
-                    self._init_BB=l_bb_box
-                    ip1=(int(self._init_BB[0]),int(self._init_BB[1]))
-                    ip2=(int(self._init_BB[0]+self._init_BB[2]),int(self._init_BB[1]+self._init_BB[3]))
-                    # cv2.rectangle(self.robot_stream_colour, ip1, ip2, (0,255,0), 2, 1)
-                    # cv2.putText(self.robot_stream_colour, "Re-init BB", ip1, 
-                                        # cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                    self._tracker.init(self.robot_stream_colour,l_bb_box)
-        self.publisher_tracked_person_image.publish(self._cvbridge.cv2_to_imgmsg(self.robot_stream_colour))
+
         cv2.imshow("Tracking",self.robot_stream_colour)
-        cv2.waitKey(1)
+        # self.debug_test()     
+        cv2.waitKey(1) 
 
+    def debug_test(self):
+        '''
+        Here we add test scipts
 
+        '''
+        
+
+        try:
+            cv2.imshow("Depth",self.robot_stream_depth)
+
+        except:
+            pass
 
 
 def main(args=None):
     rclpy.logging._root_logger.log(
-        'Starting person tracking ...',
+        'Starting person tracker  ...',
         LoggingSeverity.INFO
     )
     rclpy.init(args=args)
-    person_tracker = PersonTracker()
+
+    person_tracker=SortTracker()
+
     rclpy.spin(person_tracker)
+
     # Destroy the node explicitly  
     person_tracker.destroy_node()
     rclpy.shutdown()

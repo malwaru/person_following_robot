@@ -58,9 +58,8 @@ install(PROGRAMS
   scripts/person_tracker.py
   scripts/webcam_publisher.py
   scripts/tf_static_transformer.py
-  scripts/tf_fake_broadcaster.py
-  scripts/realsense_camera.py
   scripts/aruco_detector.py
+  scripts/test_script.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

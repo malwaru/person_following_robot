@@ -55,11 +55,18 @@ def generate_launch_description():
 
     )
 
-    person_tracker=TimerAction(period=10.0,actions=[Node(
-        package="person_following_robot",
-        executable="person_tracker.py",
-        namespace="person_following_robot"
-    )])
+    # person_tracker=TimerAction(period=5.0,actions=[Node(
+    #     package="person_following_robot",
+    #     executable="person_tracker.py",
+    #     namespace="person_following_robot"
+    # )])
+
+    person_tracker=Node(
+    package="person_following_robot",
+    executable="person_tracker.py",
+    namespace="person_following_robot"
+
+    )
 
     # ld.add_action(realsense_camera)
     ld.add_action(tf_broadcaster)
