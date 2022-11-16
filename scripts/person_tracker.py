@@ -98,14 +98,14 @@ class SortTracker(Node):
 
         
         ## Pyrealsense instrics of the depth camera 
-        self.depth_intrinsic = rs.pyrealsense2.intrinsics()
+        self.depth_intrinsic = rs.intrinsics()
         self.depth_intrinsic.width = 424
         self.depth_intrinsic.height = 240
         self.depth_intrinsic.ppx = 213.47621154785156
         self.depth_intrinsic.ppy = 121.29695892333984
         self.depth_intrinsic.fx = 306.0126953125
         self.depth_intrinsic.fy = 306.1602783203125
-        self.depth_intrinsic.model = rs.pyrealsense2.distortion.inverse_brown_conrady
+        self.depth_intrinsic.model = rs.distortion.inverse_brown_conrady
         self.depth_intrinsic.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
 
 
