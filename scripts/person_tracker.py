@@ -358,7 +358,6 @@ class SortTracker(Node):
 
             
 
-            self.tracked_person_pose.header.seq = 1
             self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
             self.tracked_person_pose.header.frame_id = "base_link"
 
