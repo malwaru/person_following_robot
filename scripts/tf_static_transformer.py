@@ -26,7 +26,6 @@ class StaticFramePublisher(Node):
       super().__init__('static_tf2_broadcaster')
 
       self._tf_publisher = StaticTransformBroadcaster(self)
-
       # Publish static transforms once at startup
       self.make_transforms(transformation)
 

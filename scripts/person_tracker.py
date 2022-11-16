@@ -1,8 +1,28 @@
 #!/usr/bin/env python3
+
+
+  ############
+        ##  To Do
+        ############
+        ## 1. Load the sort algorithms params from a config file
+        ## 2. Get real depth camera intriscis/ load from yaml
+        ##      a. check the source path 
+
+
+
+
+
+
+
+
+
+
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge 
+from geometry_msgs.msg import PoseStamped
 from rclpy.logging import LoggingSeverity
 from person_following_robot.msg import ObjectList, TrackedObject
 import cv2
@@ -18,6 +38,18 @@ class SortTracker(Node):
 
     def __init__(self, device=0):
         super().__init__('person_tracker')
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('depth_intrinsic_width', None),
+                ('depth_intrinsic_height', None),
+                ('depth_intrinsic_ppx', None),
+                ('depth_intrinsic_ppy', None),
+                ('depth_intrinsic_fx', None),
+                ('depth_intrinsic_fy', None),
+                ('depth_intrinsic_model', None),
+                ('depth_intrinsic_coeffs', None)            
+            ])
 
         self._subscriber_rec_people_data = self.create_subscription(
                                                 ObjectList,
@@ -46,22 +78,26 @@ class SortTracker(Node):
                                         self.aruco_data_callback,
                                         10)
         self._subscriber_aruco_data 
+
+
+        self.publisher_tracked_person = self.create_publisher(
+                                        PoseStamped,
+                                        'tracked_person/position', 
+                                        10)
         # Other variables
         self._cvbridge = CvBridge()
         self.robot_stream_colour = None
+        ##Sort tracker
         self._tracker = Sort(max_age=5,min_hits=3,iou_threshold=0.3)
         self.leader_found=False
         self.tracked_idx=-1
         self.aruco_data = {"success": False, "position": [0, 0]}
         self.recognised_people = np.empty((0, 5))
         cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
+        self.tracked_person_pose = PoseStamped()
 
-        ## 
-        self.figure1=plt.figure()
-        self.ax1=self.figure1.add_subplot(111)
-        self.ax1.set(title="Depth_distribution",xlabel="Points",ylabel="Depth(m)")
-
-        ## Pyrealsense
+        
+        ## Pyrealsense instrics of the depth camera 
         self.depth_intrinsic = rs.pyrealsense2.intrinsics()
         self.depth_intrinsic.width = 424
         self.depth_intrinsic.height = 240
@@ -74,6 +110,13 @@ class SortTracker(Node):
 
 
 
+        ## Plot variabls
+        self.figure1=plt.figure()
+        self.ax1=self.figure1.add_subplot(111)
+        self.ax1.set(title="Depth_distribution",xlabel="Points",ylabel="Depth(m)")
+
+
+      
 
 
     def rec_people_data_callback(self,msg):
@@ -186,6 +229,7 @@ class SortTracker(Node):
         
         '''
         ## TO D0 :
+        ## 1. Try the mean and median depths
 
         depth_list=[]
         w= (self.robot_stream_depth.shape)[0]
@@ -204,12 +248,9 @@ class SortTracker(Node):
 
         depth_copy_list=copy.deepcopy(depth_list)
         new_depth_list=self.remove_outliers(depth_copy_list)
-        mean_depth=np.mean(new_depth_list)
-        # mean_depth=st.mode(new_depth_list)
-        # self.get_logger().info(f"Mode depth {mean_depth} ")
+        mean_depth=np.mean(new_depth_list)      
         depth=mean_depth
         depth_point=self.closest_point(depth,(x1,x2,y1,y2))
-        # self.get_logger().info(f"depth point {depth_point} ")
         position=[depth_point[0],depth_point[1],depth]
         # position=rs.rs2_deproject_pixel_to_point([float(mid_x),float(mid_y)],float(mid_z))
 
@@ -292,9 +333,9 @@ class SortTracker(Node):
         y= int((y1+y2)/2)       
         depth=self.robot_stream_depth[y,x]             
         pixel_point=[float(x),float(y)]
-        position2=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
-        self.get_logger().info(f"Positio {position2}")
-        position=[x,y,np.round(depth,2)]
+        position=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
+        # self.get_logger().info(f"Positio {position2}")
+        # position=[x,y,np.round(depth,2)]
 
 
         return position
@@ -310,32 +351,35 @@ class SortTracker(Node):
 
         if  self.leader_found and len(track_bbox)>0:        
             cv2.rectangle(self.robot_stream_colour, track_bbox[0], track_bbox[1], (255,0,0), 2, 1)
-            pos=self.get_position(track_bbox[0], track_bbox[1])
+            pos=self.get_position_2(track_bbox[0], track_bbox[1])
             print_pos=str(pos[2])+" m"
             cv2.putText(self.robot_stream_colour, print_pos, (track_bbox[0][0]+10,track_bbox[0][1]),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-            cv2.circle(self.robot_stream_colour, (pos[0],pos[1]), 5, (255, 0, 0), 2)
+
+            
+
+            self.tracked_person_pose.header.seq = 1
+            self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
+            self.tracked_person_pose.header.frame_id = "base_link"
+
+            self.tracked_person_pose.pose.position.x = pos[0]
+            self.tracked_person_pose.pose.position.y = pos[1]
+            self.tracked_person_pose.pose.position.z = pos[2]
+
+            self.tracked_person_pose.pose.orientation.x = 0.0
+            self.tracked_person_pose.pose.orientation.y = 0.0
+            self.tracked_person_pose.pose.orientation.z = 0.0
+            self.tracked_person_pose.pose.orientation.w = 1.0
+            self.publisher_tracked_person.publish(self.tracked_person_pose)
+            # cv2.circle(self.robot_stream_colour, (pos[0],pos[1]), 5, (255, 0, 0), 2)
             
         else:
             cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
 
         cv2.imshow("Tracking",self.robot_stream_colour)
-        # self.debug_test()     
         cv2.waitKey(1) 
 
-    def debug_test(self):
-        '''
-        Here we add test scipts
-
-        '''
-        
-
-        try:
-            cv2.imshow("Depth",self.robot_stream_depth)
-
-        except:
-            pass
 
 
 def main(args=None):

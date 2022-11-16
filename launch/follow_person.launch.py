@@ -14,10 +14,12 @@
 #############################################################################
 #############################################################################
 
-
+import os
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import TimerAction
+
 
 
 def generate_launch_description():
@@ -61,10 +63,17 @@ def generate_launch_description():
     #     namespace="person_following_robot"
     # )])
 
+    person_tracker_config = os.path.join(
+    get_package_share_directory('person_following_robot'),
+    'config',
+    'person_tracker_params.yaml'
+    )
+
     person_tracker=Node(
     package="person_following_robot",
     executable="person_tracker.py",
-    namespace="person_following_robot"
+    namespace="person_following_robot",
+    parameters=[person_tracker_config]
 
     )
 

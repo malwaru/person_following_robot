@@ -1,0 +1,12 @@
+person_tracker:
+  ros__parameters:
+    depth_intrinsic_width : 424
+    depth_intrinsic_height : 240
+    depth_intrinsic_ppx : 213.47621154785156
+    depth_intrinsic_ppy : 121.29695892333984
+    depth_intrinsic_fx : 306.0126953125
+    depth_intrinsic_fy : 306.1602783203125
+    depth_intrinsic_model : "rs.pyrealsense2.distortion.inverse_brown_conrady"
+    depth_intrinsic_coeffs : [0.0, 0.0, 0.0, 0.0, 0.0]
+
+
