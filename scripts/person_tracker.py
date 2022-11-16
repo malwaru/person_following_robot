@@ -313,7 +313,7 @@ class PersonTracker(Node):
 
 
                 cv2.putText(self.robot_stream_colour, print_pos, (p1[0]+10,p1[1]), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,0),2)
                 
                 track_person_data=TrackedObject(name="Person",id=1,success=True,position=position)
                 self.publisher_tracked_person_data.publish(track_person_data)
