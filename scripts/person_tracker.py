@@ -88,7 +88,7 @@ class SortTracker(Node):
         self._cvbridge = CvBridge()
         self.robot_stream_colour = None
         ##Sort tracker
-        self._tracker = Sort(max_age=5,min_hits=3,iou_threshold=0.3)
+        self._tracker = Sort(max_age=1,min_hits=3,iou_threshold=0.3)
         self.leader_found=False
         self.tracked_idx=-1
         self.aruco_data = {"success": False, "position": [0, 0]}
@@ -352,7 +352,7 @@ class SortTracker(Node):
         if  self.leader_found and len(track_bbox)>0:        
             cv2.rectangle(self.robot_stream_colour, track_bbox[0], track_bbox[1], (255,0,0), 2, 1)
             pos=self.get_position_2(track_bbox[0], track_bbox[1])
-            print_pos=str(pos[2])+" m"
+            print_pos="x "+str(np.round(pos[2],3))+" m  y:"+str(pos[0])
             cv2.putText(self.robot_stream_colour, print_pos, (track_bbox[0][0]+10,track_bbox[0][1]),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
@@ -360,16 +360,17 @@ class SortTracker(Node):
 
             self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
             self.tracked_person_pose.header.frame_id = "base_link"
-
-            self.tracked_person_pose.pose.position.x = pos[0]
-            self.tracked_person_pose.pose.position.y = pos[1]
-            self.tracked_person_pose.pose.position.z = pos[2]
+            ##Check camer frame to base link frame conversion 
+            self.tracked_person_pose.pose.position.x = pos[2]
+            self.tracked_person_pose.pose.position.y = pos[0]
+            self.tracked_person_pose.pose.position.z = pos[1]
 
             self.tracked_person_pose.pose.orientation.x = 0.0
             self.tracked_person_pose.pose.orientation.y = 0.0
             self.tracked_person_pose.pose.orientation.z = 0.0
             self.tracked_person_pose.pose.orientation.w = 1.0
             self.publisher_tracked_person.publish(self.tracked_person_pose)
+            self.get_logger().info(f"Track personm pose {self.tracked_person_pose}")
             # cv2.circle(self.robot_stream_colour, (pos[0],pos[1]), 5, (255, 0, 0), 2)
             
         else:
