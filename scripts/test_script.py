@@ -6,7 +6,7 @@ from cv_bridge import CvBridge
 from rclpy.logging import LoggingSeverity
 from person_following_robot.msg import ObjectList, TrackedObject
 import cv2
-from sort import Sort 
+# from sort import Sort 
 import numpy as np
 
 
@@ -353,6 +353,30 @@ class SortTracker(Node):
             
 
 
+class ParameterCheck(Node):
+    def __init__(self) -> None:
+        super().__init__('tracker')        
+        
+        self._subscriber_rec_people_data = self.create_subscription(
+                                            Image,
+                                            '/aligned_depth_to_color/image_raw',
+                                            self.camera_image_depth_callback,
+                                            10)
+
+
+        self._cvbridge=CvBridge()
+
+    def camera_image_depth_callback(self,msg):
+        '''
+        M
+        '''
+        robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+        ## The scale of depth pixels is 0.001|  16bit depth, one unit is 1 mm, 
+        self.robot_stream_depth = np.array(robot_stream_depth, dtype=np.uint16)*0.001
+
+        self.get_logger().info(f"Depth shape {self.robot_stream_depth.shape}")
+
+
 
 
 def main(args=None):
@@ -364,7 +388,7 @@ def main(args=None):
     # test_script = WebStream()
     # test_script=CVTracker()
 
-    test_script=SortTracker()
+    test_script=ParameterCheck()
 
     rclpy.spin(test_script)
 

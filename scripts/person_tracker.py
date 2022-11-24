@@ -96,16 +96,17 @@ class SortTracker(Node):
         cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
         self.tracked_person_pose = PoseStamped()
 
-        
+
         ## Pyrealsense instrics of the depth camera 
+        ## 
         self.depth_intrinsic = rs.intrinsics()
-        self.depth_intrinsic.width = 424
-        self.depth_intrinsic.height = 240
-        self.depth_intrinsic.ppx = 213.47621154785156
-        self.depth_intrinsic.ppy = 121.29695892333984
-        self.depth_intrinsic.fx = 306.0126953125
-        self.depth_intrinsic.fy = 306.1602783203125
-        self.depth_intrinsic.model = rs.distortion.inverse_brown_conrady
+        self.depth_intrinsic.width = 640
+        self.depth_intrinsic.height = 480
+        self.depth_intrinsic.ppx = 322.043121337891
+        self.depth_intrinsic.ppy = 238.831329345703
+        self.depth_intrinsic.fx = 393.181854248047
+        self.depth_intrinsic.fy = 393.181854248047
+        self.depth_intrinsic.model = rs.distortion.brown_conrady
         self.depth_intrinsic.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
 
 
@@ -116,7 +117,7 @@ class SortTracker(Node):
         self.ax1.set(title="Depth_distribution",xlabel="Points",ylabel="Depth(m)")
 
 
-      
+
 
 
     def rec_people_data_callback(self,msg):
@@ -143,6 +144,8 @@ class SortTracker(Node):
         '''
         Call back function for camera depth and decode
         using passthrough
+        The size of the image is (480, 640)
+
         '''
         robot_stream_depth = self._cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
         ## The scale of depth pixels is 0.001|  16bit depth, one unit is 1 mm, 
