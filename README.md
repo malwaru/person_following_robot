@@ -6,7 +6,7 @@ The person recognition is based on the work done by [1] original repository can 
 The tracking is done by the sort [2] original code available at https://github.com/abewley/sort . In this project we are using a modified version available at https://github.com/malwaru/sort
 
 
-<img src="https://raw.githubusercontent.com/malwaru/person_following_robot/blob/devel/images/Tracking_pipeline.png" width="600">
+<img src="https://raw.githubusercontent.com/malwaru/person_following_robot/devel/images/Tracking_pipeline.png" width="400">
 ## Installation
 
 ### Person Following Robot package 
