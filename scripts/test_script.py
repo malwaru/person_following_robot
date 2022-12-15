@@ -347,7 +347,6 @@ class SortTracker(Node):
 
 
 
-        # self.recognised_people=np.empty((0, 5))
 
 
             
@@ -385,13 +384,13 @@ def main(args=None):
         LoggingSeverity.INFO
     )
     rclpy.init(args=args)
+
+
     # test_script = WebStream()
     # test_script=CVTracker()
-
     test_script=ParameterCheck()
 
     rclpy.spin(test_script)
-
     # Destroy the node explicitly  
     test_script.destroy_node()
     rclpy.shutdown()
