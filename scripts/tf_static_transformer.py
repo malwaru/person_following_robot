@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
-from geometry_msgs.msg import TransformStamped
-
 import rclpy
 from rclpy.node import Node
 from rclpy.logging import LoggingSeverity
-
-
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
-
+from geometry_msgs.msg import TransformStamped
 import tf_transformations
-
 import numpy as np
 
 
@@ -53,14 +48,13 @@ def main():
       'Starting static transformer ...',
       LoggingSeverity.INFO
    )
-   # obtain parameters from command line arguments
+   # Transformation parameters
    tansformation = {"parent_frame": "base_link",
                   "child_frame": "camera_depth_optical_frame",
                   "transform": [0, 0, 1, np.deg2rad(-90), 0, 0]}
 # pass parameters and initialize node
    rclpy.init()
    node = StaticFramePublisher(tansformation)
-   # rclpy.spin(node)
    try:
       rclpy.spin(node)
    except KeyboardInterrupt:

@@ -23,6 +23,9 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge 
 from geometry_msgs.msg import PoseStamped
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros import TransformException
 from rclpy.logging import LoggingSeverity
 from person_following_robot.msg import ObjectList, TrackedObject
 import cv2
@@ -38,18 +41,7 @@ class SortTracker(Node):
 
     def __init__(self, device=0):
         super().__init__('person_tracker')
-        self.declare_parameters(
-            namespace='',
-            parameters=[
-                ('depth_intrinsic_width', None),
-                ('depth_intrinsic_height', None),
-                ('depth_intrinsic_ppx', None),
-                ('depth_intrinsic_ppy', None),
-                ('depth_intrinsic_fx', None),
-                ('depth_intrinsic_fy', None),
-                ('depth_intrinsic_model', None),
-                ('depth_intrinsic_coeffs', None)            
-            ])
+    
 
         self._subscriber_rec_people_data = self.create_subscription(
                                                 ObjectList,
@@ -87,7 +79,8 @@ class SortTracker(Node):
         # Other variables
         self._cvbridge = CvBridge()
         self.robot_stream_colour = None
-        ##Sort tracker
+
+        ##Tracker related
         self._tracker = Sort(max_age=1,min_hits=3,iou_threshold=0.3)
         self.leader_found=False
         self.tracked_idx=-1
@@ -95,6 +88,9 @@ class SortTracker(Node):
         self.recognised_people = np.empty((0, 5))
         cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
         self.tracked_person_pose = PoseStamped()
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer,self)
+
 
 
         ## Pyrealsense instrics of the depth camera 
@@ -215,10 +211,13 @@ class SortTracker(Node):
 
         return bbox
 
-    def get_position(self,p1,p2):
-        '''Get the distance to the person 
-           Removes outliers and get the average distance to 
-           the mid point of the bounding box
+    def get_position_filtered_mean(self,p1,p2):
+        '''Removes outliers and get the mean distance
+
+            This method is intented to be used in the case where the 
+            middle point of the bounding box does not fall on the 
+            person 
+           
 
            Params:
            --------
@@ -308,10 +307,9 @@ class SortTracker(Node):
         return final_data
 
 
-    def get_position_2(self,p1,p2):
-        '''Get the distance to the person 
-        Removes outliers and get the average distance to 
-        the mid point of the bounding box
+    def get_position_middle(self,p1,p2):
+        '''
+        Output the distance of the mid point of the bounding box    
 
         Params:
         --------
@@ -323,9 +321,7 @@ class SortTracker(Node):
         position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
         
         
-        '''
-        ## TO D0 :
-        ## Get point with min distance in the bounding box        
+        '''        
         w= (self.robot_stream_depth.shape)[0]
         l= (self.robot_stream_depth.shape)[1]
         x1=np.clip(p1[0],0,w-1)
@@ -336,9 +332,9 @@ class SortTracker(Node):
         y= int((y1+y2)/2)       
         depth=self.robot_stream_depth[y,x]             
         pixel_point=[float(x),float(y)]
+        ##Getting position in depth camera frame
         position=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
-        # self.get_logger().info(f"Positio {position2}")
-        # position=[x,y,np.round(depth,2)]
+ 
 
 
         return position
@@ -354,24 +350,30 @@ class SortTracker(Node):
 
         if  self.leader_found and len(track_bbox)>0:        
             cv2.rectangle(self.robot_stream_colour, track_bbox[0], track_bbox[1], (255,0,0), 2, 1)
-            pos=self.get_position_2(track_bbox[0], track_bbox[1])
+            ##Getting position in depth camera frame
+            pos=self.get_position_middle(track_bbox[0], track_bbox[1])
             print_pos="x "+str(np.round(pos[2],3))+" m  y:"+str(pos[0])
             cv2.putText(self.robot_stream_colour, print_pos, (track_bbox[0][0]+10,track_bbox[0][1]),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
             
-
+            ##Pose in camera depth frame
             self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
-            self.tracked_person_pose.header.frame_id = "base_link"
-            ##Check camer frame to base link frame conversion 
+            self.tracked_person_pose.header.frame_id = "camera_depth_optical_frame"
             self.tracked_person_pose.pose.position.x = pos[2]
             self.tracked_person_pose.pose.position.y = pos[0]
             self.tracked_person_pose.pose.position.z = pos[1]
-
             self.tracked_person_pose.pose.orientation.x = 0.0
             self.tracked_person_pose.pose.orientation.y = 0.0
             self.tracked_person_pose.pose.orientation.z = 0.0
             self.tracked_person_pose.pose.orientation.w = 1.0
+            ##Get pose in the base link frame 
+            self.tracked_person_pose=self.tf_buffer.transform(self.tracked_person_pose,'base_link')
+
+
+
+
+
             self.publisher_tracked_person.publish(self.tracked_person_pose)
             self.get_logger().info(f"Track personm pose {self.tracked_person_pose}")
             # cv2.circle(self.robot_stream_colour, (pos[0],pos[1]), 5, (255, 0, 0), 2)
