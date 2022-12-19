@@ -1,28 +1,9 @@
 #!/usr/bin/env python3
-
-
-  ############
-        ##  To Do
-        ############
-        ## 1. Load the sort algorithms params from a config file
-        ## 2. Get real depth camera intriscis/ load from yaml
-        ##      a. check the source path 
-
-
-
-
-
-
-
-
-
-
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped,PointStamped,Point
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros import TransformException
@@ -35,6 +16,16 @@ import pyrealsense2 as rs
 import copy
 from scipy import stats as st
 import matplotlib.pyplot as plt
+
+
+
+
+########################
+##  To Do
+########################
+## 1. Load the sort algorithms params from a config file
+## 2. Get real depth camera intriscis/ load from yaml
+##      a. check the source path 
 
 
 class SortTracker(Node):
@@ -73,7 +64,7 @@ class SortTracker(Node):
 
 
         self.publisher_tracked_person = self.create_publisher(
-                                        PoseStamped,
+                                        PointStamped,
                                         'tracked_person/position', 
                                         10)
         # Other variables
@@ -87,7 +78,7 @@ class SortTracker(Node):
         self.aruco_data = {"success": False, "position": [0, 0]}
         self.recognised_people = np.empty((0, 5))
         cv2.namedWindow("Tracking", cv2.WINDOW_AUTOSIZE)
-        self.tracked_person_pose = PoseStamped()
+        self.tracked_person_position = PointStamped()
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer,self)
 
@@ -357,24 +348,24 @@ class SortTracker(Node):
 
             
             ##Pose in camera depth frame
-            self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
-            self.tracked_person_pose.header.frame_id = 'camera_depth_optical_frame'
-            #In the camera Frame x in the Z direction 
-            self.tracked_person_pose.pose.position.x = pos[2]
-            self.tracked_person_pose.pose.position.y = pos[0]
-            self.tracked_person_pose.pose.position.z = pos[1]
-            self.tracked_person_pose.pose.orientation.x = 0.0
-            self.tracked_person_pose.pose.orientation.y = 0.0
-            self.tracked_person_pose.pose.orientation.z = 0.0
-            self.tracked_person_pose.pose.orientation.w = 1.0
-            ##Get pose in the base link frame 
-            try:
-                #Transform the pose to base_link frame # Source https://w3.cs.jmu.edu/spragunr/CS354_S19/lectures/tf/tf2_demo.py
-                self.tracked_person_pose=self.tf_buffer.transform(self.tracked_person_pose,'base_link')
-            except TransformException as ex:
-                self.get_logger().info(f"Could to find tf transform {ex}")
-            self.publisher_tracked_person.publish(self.tracked_person_pose)
-   
+            # self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
+            self.tracked_person_position.header.frame_id = 'camera_depth_optical_frame'
+            #In the camera Frame Z in the X direction in robot coordinate system 
+            #Here we take that into account
+            self.tracked_person_position.point.x = pos[2]
+            self.tracked_person_position.point.y = pos[0]
+            self.tracked_person_position.point.z = pos[1]
+        
+            ##Check if the transformation is available 
+            
+            if self.tf_buffer.can_transform('camera_depth_optical_frame','base_link',self.get_clock().now()):
+                try:
+                    #Transform the pose to base_link frame # Source https://w3.cs.jmu.edu/spragunr/CS354_S19/lectures/tf/tf2_demo.py
+                    self.tracked_person_pose=self.tf_buffer.transform(self.tracked_person_position,'base_link')
+                except TransformException as ex:
+                    self.get_logger().info(f"Could to find tf transform {ex}")
+                self.publisher_tracked_person.publish(self.tracked_person_position)
+    
             
         else:
             cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
