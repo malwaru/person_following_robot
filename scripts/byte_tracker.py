@@ -161,7 +161,7 @@ class TrackerByte(Node):
         self.depth_intrinsic.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
 
         #Tracking leader 
-        self.leader_found=False
+        # self.leader_found=False
         self.tracked_idx=-1
         self.aruco_data = {"success": False, "position": [0, 0]}
         self.tracked_person_pose = PoseStamped()
