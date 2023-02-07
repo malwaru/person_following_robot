@@ -77,11 +77,19 @@ def generate_launch_description():
 
     )
 
+    byte_tracker=Node(
+    package="person_following_robot",
+    executable="byte_tracker.py",
+    namespace="person_following_robot"
+    )
+
     # ld.add_action(realsense_camera)
     ld.add_action(tf_broadcaster)
     ld.add_action(aruco_detector)
-    ld.add_action(yolo_infer)
-    ld.add_action(person_tracker)
+    # ld.add_action(yolo_infer)
+    ld.add_action(byte_tracker)
+    # ld.add_action(person_tracker)
+
 
 
 

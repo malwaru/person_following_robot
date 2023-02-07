@@ -309,7 +309,8 @@ class SortTracker(Node):
 
 
     def get_position_2(self,p1,p2):
-        '''Get the distance to the person 
+        '''
+        Get the distance to the person 
         Removes outliers and get the average distance to 
         the mid point of the bounding box
 

@@ -60,6 +60,7 @@ install(PROGRAMS
   scripts/tf_static_transformer.py
   scripts/aruco_detector.py
   scripts/test_script.py
+  scripts/byte_tracker.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
