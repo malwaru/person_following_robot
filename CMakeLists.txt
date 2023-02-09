@@ -54,13 +54,10 @@ install(TARGETS
 ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
-  scripts/yolo_infer.py
-  scripts/person_tracker.py
-  scripts/webcam_publisher.py
   scripts/tf_static_transformer.py
   scripts/aruco_detector.py
   scripts/test_script.py
-  scripts/byte_tracker.py
+  scripts/person_tracker.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
