@@ -1,9 +1,10 @@
 numpy
 empy 
-opencv-contrib-python
+opencv-contrib-python==4.7.0.68
 PyYAML 
 torch 
 torchvision 
 torchaudio 
 Cython
 pyrealsense2
+transforms3d

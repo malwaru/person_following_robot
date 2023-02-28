@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: yolov6
+Version: 1.0.0
+Summary: Python package of the Yolov6
+Home-page: UNKNOWN
+Author: Malika Navaratna
+Author-email: malikawarunamal@gmail.com
+License: LICENSE
+Description: UNKNOWN
+Platform: UNKNOWN
+Requires-Python: >=3.6
+Provides-Extra: tests
