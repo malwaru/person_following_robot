@@ -32,7 +32,7 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
-# Include launch directory
+# Include config directory
 install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
