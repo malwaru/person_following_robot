@@ -55,7 +55,7 @@ def main():
    )
    # obtain parameters from command line arguments
    tansformation = {"parent_frame": "base_link",
-                  "child_frame": "camera_depth_optical_frame",
+                  "child_frame": "camera_color_optical_frame",
                   "transform": [0, 0, 1, np.deg2rad(-90), 0, 0]}
 # pass parameters and initialize node
    rclpy.init()

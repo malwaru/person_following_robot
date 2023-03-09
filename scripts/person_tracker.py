@@ -123,14 +123,14 @@ class TrackerByte(Node):
         super().__init__('byte_tracker')
         self._subscriber_camera_image_raw = self.create_subscription(
                                                 Image,
-                                                '/color/image_raw',
+                                                '/camera/color/image_raw',
                                                 self.camera_image_raw_callback,
                                                 10)
         self._subscriber_camera_image_raw 
         
         self._subscriber_camera_image_depth = self.create_subscription(
                                                     Image,
-                                                    '/aligned_depth_to_color/image_raw',
+                                                    '/camera/aligned_depth_to_color/image_raw',
                                                     self.camera_image_depth_callback,
                                                     10)
         self._subscriber_camera_image_depth  
@@ -283,7 +283,7 @@ class TrackerByte(Node):
         
         return position
 
-    def imageflow_demo(self):          
+    def imageflow_demo(self):  
         frame = self.robot_stream_colour
         if (self.robot_stream_colour) is not None:
             outputs, img_info = self.predictor.inference(frame, self.timer)
@@ -354,7 +354,7 @@ def main(args=None):
     #Start of ROS node
 
     rclpy.logging._root_logger.log(
-        'Starting webcam streaming  ...',
+        'Starting person tracking  ...',
         LoggingSeverity.INFO
     )
     rclpy.init(args=args)

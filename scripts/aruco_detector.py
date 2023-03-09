@@ -24,7 +24,7 @@ class ArucoDetector(Node):
         super().__init__('aruco_detector')
         self._subscriber_camera_image_raw = self.create_subscription(
                                                 Image,
-                                                '/color/image_raw',
+                                                '/camera/color/image_raw',
                                                 self.camera_image_raw_callback,
                                                 10)
         self._subscriber_camera_image_raw  # prevent unused variable warning
