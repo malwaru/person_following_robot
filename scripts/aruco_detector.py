@@ -24,7 +24,7 @@ class ArucoDetector(Node):
         super().__init__('aruco_detector')
         self._subscriber_camera_image_raw = self.create_subscription(
                                                 Image,
-                                                '/color/image_raw',
+                                                '/camera/color/image_raw',
                                                 self.camera_image_raw_callback,
                                                 10)
         self._subscriber_camera_image_raw  # prevent unused variable warning
@@ -39,8 +39,9 @@ class ArucoDetector(Node):
 
         self._robot_stream_colour = None
         self._cvbridge=CvBridge()
-        self.arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_7X7_50)
-        self.arucoParams = cv2.aruco.DetectorParameters_create()
+        aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_7X7_50)
+        aruco_params = cv2.aruco.DetectorParameters()
+        self.aruco_detector=cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
 
 
@@ -61,7 +62,7 @@ class ArucoDetector(Node):
         '''
 
         stream=self._robot_stream_colour
-        (corners, ids, rejected) = cv2.aruco.detectMarkers(stream, self.arucoDict,parameters=self.arucoParams)
+        (corners, ids, rejected) = self.aruco_detector.detectMarkers(stream)
         topLeft=[20,50]
         topRight=[10,10]
         # cv2.namedWindow("Image",cv2.WINDOW_FREERATIO)
