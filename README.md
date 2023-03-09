@@ -41,9 +41,12 @@ If you need to run individual scripts use the following format, <span style="col
 
 `ros2 run person_following_robot <script>  --ros-args -r __ns:=/person_following_robot` 
 
-## Roadmap
+## To Do
 
-- Currently the 
+- Load all the topic names from a config file in each script
+- Load the frames from handcart description file instead of static transformer
+    - Check with romatris_handcart_description packahe to include realsense_description file 
+- Create one master package or script to load all packages 
 
 
 
