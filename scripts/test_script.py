@@ -5,6 +5,16 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge 
 from rclpy.logging import LoggingSeverity
 from person_following_robot.msg import ObjectList, TrackedObject
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from geometry_msgs.msg import PoseStamped,PointStamped,Point
+from tf2_geometry_msgs import PointStamped
+from rclpy.duration import Duration
+import time 
+from scipy.spatial.transform import Rotation
+
+
 import cv2
 # from sort import Sort 
 import numpy as np
@@ -35,7 +45,6 @@ class WebStream(Node):
         ros_image=self._cvbridge.cv2_to_imgmsg(stream)    
         self.publisher_webstream.publish(ros_image)
         cv2.waitKey(1)
-        
 
 class CVTracker(Node):
 
@@ -433,13 +442,6 @@ class ArucoDetector(Node):
                 marker_data=TrackedObject(name="Aruco",id=0,success=False,position=[])
                 self.publisher_aruco_data.publish(marker_data)
  
-
-
-
-
-            
-
-
 class ParameterCheck(Node):
     def __init__(self) -> None:
         super().__init__('tracker')        
@@ -464,6 +466,139 @@ class ParameterCheck(Node):
         self.get_logger().info(f"Depth shape {self.robot_stream_depth.shape}")
 
 
+class TfTransform(Node):
+    def __init__(self):
+        super().__init__('tfseer')        
+   
+        self._subscriber_camera_image_raw = self.create_subscription(
+                                        Image,
+                                        '/camera/color/image_raw',
+                                        self.camera_image_raw_callback,
+                                        10)
+        self.frame_source = self.declare_parameter(
+          'source_frame', 'camera_color_optical_frame').get_parameter_value().string_value
+        self.frame_target = self.declare_parameter(
+          'target_frame', 'base_link').get_parameter_value().string_value
+        # self.frame_source='camera_color_optical_frame'
+        # self.frame_target='base_link'
+
+        self.tracked_person_position= PoseStamped()
+        self.tracked_person_point= PointStamped()
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer,self)
+        # self.check_transform()
+        # self.timer = self.create_timer(0.2, self.check_transform)
+        self.tracked_person_position.header.frame_id=self.frame_source
+        self.tracked_person_position.pose.orientation.x = 0.0
+        self.tracked_person_position.pose.orientation.y = 0.0
+        self.tracked_person_position.pose.orientation.z = 0.0
+        self.tracked_person_position.pose.orientation.w = 1.0
+
+        self.tracked_person_point.header.frame_id = 'camera_depth_optical_frame'
+
+
+
+
+    def coordinate_transform(self,t_x,t_y,t_z,r_x,r_y,r_z,r_w,position):
+        '''
+        '''
+        self.tracked_person_point.point.x = float(np.random.randint(0,30))
+        self.tracked_person_point.point.y = float(np.random.randint(0,30))
+        self.tracked_person_point.point.z = float(np.random.randint(0,30)) 
+
+        rot_x=tranformer.transform.rotation.x
+        rot_y=tranformer.transform.rotation.y
+        rot_z=tranformer.transform.rotation.z
+        rot_w=tranformer.transform.rotation.w
+        tran_x=tranformer.transform.translation.x
+        tran_y=tranformer.transform.translation.x
+        tran_z=tranformer.transform.translation.z
+
+
+    def coordinate_transform_2(self,transformer,position):
+        '''
+        '''
+      
+        rot_x=tranformer.transform.rotation.x
+        rot_y=tranformer.transform.rotation.y
+        rot_z=tranformer.transform.rotation.z
+        rot_w=tranformer.transform.rotation.w
+        tran_x=tranformer.transform.translation.x
+        tran_y=tranformer.transform.translation.x
+        tran_z=tranformer.transform.translation.z
+
+
+    def camera_image_raw_callback(self,msg):
+        self.tracked_person_position.header.stamp=self.get_clock().now().to_msg()
+        self.tracked_person_position.pose.position.x = float(np.random.randint(0,30))
+        self.tracked_person_position.pose.position.y = float(np.random.randint(0,30))
+        self.tracked_person_position.pose.position.z = float(np.random.randint(0,30))  
+
+
+        self.tracked_person_point.point.x = float(np.random.randint(0,30))
+        self.tracked_person_point.point.y = float(np.random.randint(0,30))
+        self.tracked_person_point.point.z = float(np.random.randint(0,30))    
+
+        
+
+        # if self.tf_buffer.can_transform('camera_depth_optical_frame','base_link',rclpy.time.Time()):
+        #     try:
+        #         tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
+        #         self.tracked_person_position.header.frame_id=self.frame_source
+
+        #         # self.tracked_person_position.header.stamp=self.get_clock().now().to_msg()
+        #         self.tracked_person_position.pose.position.x = float(np.random.randint(0,30))
+        #         self.tracked_person_position.pose.position.y = float(np.random.randint(0,30))
+        #         self.tracked_person_position.pose.position.z = float(np.random.randint(0,30))  
+        #         self.tracked_person_position=self.tf_buffer.transform(self.tracked_person_position,'base_link')
+        #         self.get_logger().info(f"Found Transform")
+
+        #     except TransformException as ex:
+        #         self.get_logger().info(f"Could to find tf transform {ex}")
+
+        # else:
+        #     self.get_logger().info(f"can_transform failed")
+
+        try:
+            tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
+            rot_x=tranformer.transform.rotation.x
+            rot_y=tranformer.transform.rotation.y
+            rot_z=tranformer.transform.rotation.z
+            rot_w=tranformer.transform.rotation.w
+            tran_x=tranformer.transform.translation.x
+            tran_y=tranformer.transform.translation.x
+            tran_z=tranformer.transform.translation.z
+            self.coordinate_transform(tran_x,tran_x)
+            rot_quat=Rotation.from_quat('xyzw', [rot_x,rot_y, rot_z,rot_w], degrees=False)
+            rot_euler=rot_quat.as_euler()
+            # self.tracked_person_point = tf2_geometry_msgs.do_transform_point(self.tracked_person_point, transform)
+
+            self.get_logger().info(f'Running tranform')
+
+        except TransformException as ex:
+            self.get_logger().info(f"Could to find tf transform {ex}")
+
+
+            
+
+    def check_transform(self):
+
+
+
+        self.tracked_person_position.header.frame_id = self.frame_target
+        self.tracked_person_position.point.x = float(np.random.randint(0,30))
+        self.tracked_person_position.point.y = float(np.random.randint(0,30))
+        self.tracked_person_position.point.z = float(np.random.randint(0,30)) 
+        duration = Duration(seconds=1.1,nanoseconds=0)
+
+
+        # try:
+        #     tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
+        #     # self.tracked_person_pose=self.tf_buffer.transform(self.tracked_person_position,'base_link')
+        #     self.get_logger().info(f'Running tranform')
+
+        # except TransformException as ex:
+        #     self.get_logger().info(f"Could to find tf transform {ex}")
 
 
 def main(args=None):
@@ -472,13 +607,9 @@ def main(args=None):
         LoggingSeverity.INFO
     )
     rclpy.init(args=args)
-
-
     # test_script = WebStream()
     # test_script=CVTracker()
-
-    test_script=ArucoDetector()
-
+    test_script=TfTransform()
     rclpy.spin(test_script)
     # Destroy the node explicitly  
     test_script.destroy_node()

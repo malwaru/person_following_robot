@@ -39,6 +39,8 @@ def generate_launch_description():
         package="person_following_robot",
         executable="tf_static_transformer.py",
         namespace="person_following_robot"
+
+       
         
     )
     aruco_detector=Node(
@@ -54,9 +56,22 @@ def generate_launch_description():
     namespace="person_following_robot"
     )
 
+
+    test_script=Node(
+        package="person_following_robot",
+        executable="test_script.py",
+         namespace="person_following_robot",
+        remappings=[('/person_following_robot/tf', '/tf'),('/person_following_robot/tf_static', '/tf_static')]
+
+        
+    )
     ld.add_action(tf_broadcaster)
-    ld.add_action(aruco_detector)    
-    ld.add_action(person_tracker)
+    ld.add_action(aruco_detector) 
+    ld.add_action(test_script)   
+#    ld.add_action(person_tracker)
+
+
+    return ld
 
 
     # person_tracker=TimerAction(period=5.0,actions=[Node(
@@ -93,5 +108,3 @@ def generate_launch_description():
 #     parameters = [config]
 # )
         
-
-    return ld
