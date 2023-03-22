@@ -38,23 +38,21 @@ def generate_launch_description():
     tf_broadcaster=Node(
         package="person_following_robot",
         executable="tf_static_transformer.py",
-        namespace="person_following_robot"
-
-       
-        
-    )
+        namespace="person_following_robot"       
+                        )
     aruco_detector=Node(
         package="person_following_robot",
         executable="aruco_detector.py",
         namespace="person_following_robot"
 
-    )
+                        )
 
     person_tracker=Node(
     package="person_following_robot",
     executable="person_tracker.py",
-    namespace="person_following_robot"
-    )
+    namespace="person_following_robot",
+    remappings=[('/person_following_robot/tf', '/tf'),('/person_following_robot/tf_static', '/tf_static')]
+                        )
 
 
     test_script=Node(
@@ -62,13 +60,13 @@ def generate_launch_description():
         executable="test_script.py",
          namespace="person_following_robot",
         remappings=[('/person_following_robot/tf', '/tf'),('/person_following_robot/tf_static', '/tf_static')]
+                    )
 
-        
-    )
+
     ld.add_action(tf_broadcaster)
     ld.add_action(aruco_detector) 
-    ld.add_action(test_script)   
-#    ld.add_action(person_tracker)
+    # ld.add_action(test_script)   
+    ld.add_action(person_tracker)
 
 
     return ld

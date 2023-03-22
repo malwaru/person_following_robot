@@ -175,12 +175,16 @@ class TrackerByte(Node):
         self.tf_listener = TransformListener(self.tf_buffer,self)
         self.frame_source = self.declare_parameter(
           'target_frame', 'camera_color_optical_frame').get_parameter_value().string_value
-
         #self.frame_source='camera_color_optical_frame'
         self.frame_target='base_link'
 
+        _sub=str(np.random.randint(0,10000))
+        self.video_recorder = cv2.VideoWriter('/home/romatris/Workspace/Misc/TestVideos/A/a1.3.1-a1.3.3'+_sub+'.mp4', 
+                         cv2.VideoWriter_fourcc(*'MJPG'),
+                         10, (848,480))
+
         self.cvbridge = CvBridge()
-        self.robot_stream_colour = None
+        self.robot_stream_colour = None 
         self.predictor=predictor
         self.args=args
         self.exp=exp
@@ -332,6 +336,7 @@ class TrackerByte(Node):
                     tracked_position=self.get_position(tracked_bbox)
                     center=(int((tracked_bbox[0][0]+tracked_bbox[1][0])/2),int((tracked_bbox[0][1]+tracked_bbox[1][1])/2))
                     cv2.circle(self.robot_stream_colour, center, 4, (0,255,2), 2)
+                    self.video_recorder.write(self.robot_stream_colour)
 
                        
                     #In the camera Frame Z in the X direction in robot coordinate system 
@@ -342,17 +347,17 @@ class TrackerByte(Node):
                     self.tracked_person_position.point.z = tracked_position[1]                
                     ##Check if the transformation is available 
                     
-                    if self.tf_buffer.can_transform(self.frame_source,self.frame_target, rclpy.time.Time()):
-                        try:
-                            #Transform the pose to base_link frame
-                            #Source https://w3.cs.jmu.edu/spragunr/CS354_S19/lectures/tf/tf2_demo.py
-                            self.tracked_person_position=self.tf_buffer.transform(self.tracked_person_position,self.frame_target)
-                            print_pos=str(round(self.tracked_person_position.point.x,2))+" m"
-                            cv2.putText(self.robot_stream_colour, print_pos, (tracked_bbox[0][0]+10,tracked_bbox[0][1]),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                        except TransformException as ex:
-                            self.get_logger().info(f"TF error: {ex}")
-                        self.publisher_tracked_person.publish(self.tracked_person_position)
+                    # if self.tf_buffer.can_transform(self.frame_source,self.frame_target, rclpy.time.Time()):
+                        # try:
+                        #     #Transform the pose to base_link frame
+                        #     #Source https://w3.cs.jmu.edu/spragunr/CS354_S19/lectures/tf/tf2_demo.py
+                        #     self.tracked_person_position=self.tf_buffer.transform(self.tracked_person_position,self.frame_target)
+                        #     print_pos=str(round(self.tracked_person_position.point.x,2))+" m"
+                        #     cv2.putText(self.robot_stream_colour, print_pos, (tracked_bbox[0][0]+10,tracked_bbox[0][1]),
+                        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                        # except TransformException as ex:
+                        #     self.get_logger().info(f"TF error: {ex}")
+                    self.publisher_tracked_person.publish(self.tracked_person_position)
                 
 
                     # self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
@@ -380,6 +385,8 @@ class TrackerByte(Node):
                 self.timer.toc()
             cv2.imshow("Tracked",self.robot_stream_colour)
             cv2.waitKey(1)
+            self.video_recorder.write(self.robot_stream_colour)
+
         else:
             pass
         self.frame_id += 1
