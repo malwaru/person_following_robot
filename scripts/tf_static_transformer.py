@@ -51,7 +51,7 @@ def main():
    # Transformation parameters
    tansformation = {"parent_frame": "base_link",
                   "child_frame": "camera_link",
-                  "transform": [0, 0, 1, np.deg2rad(-90), 0, 0]}
+                  "transform": [0.2,0.065, 0.4, 0, 0, 0]}
 # pass parameters and initialize node
    rclpy.init()
    node = StaticFramePublisher(tansformation)

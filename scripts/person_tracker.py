@@ -11,7 +11,9 @@ import pyrealsense2 as rs
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros import TransformException
-from geometry_msgs.msg import PoseStamped,PointStamped,Point
+from geometry_msgs.msg import PointStamped
+from scipy.spatial.transform import Rotation
+
 
 
 #Bytetracker related 
@@ -80,15 +82,6 @@ class Predictor(object):
         self.test_size = exp.test_size
         self.device = device
         self.fp16 = fp16
-        # if trt_file is not None:
-        #     from torch2trt import TRTModule
-
-        #     model_trt = TRTModule()
-        #     model_trt.load_state_dict(torch.load(trt_file))
-
-        #     x = torch.ones((1, 3, exp.test_size[0], exp.test_size[1]), device=device)
-        #     self.model(x)
-        #     self.model = model_trt
         self.rgb_means = (0.485, 0.456, 0.406)
         self.std = (0.229, 0.224, 0.225)
 
@@ -157,32 +150,35 @@ class TrackerByte(Node):
 
         ## Pyrealsense depth instrics of the depth camera taken running the command 'rs-enumerate-devices -c'in terminal
         self.depth_intrinsic = rs.intrinsics()
-        self.depth_intrinsic.width = 848
+        self.depth_intrinsic.width = 640
         self.depth_intrinsic.height = 480
-        self.depth_intrinsic.ppx = 421.640045166016
-        self.depth_intrinsic.ppy =239.076782226562
-        self.depth_intrinsic.fx = 424.248107910156
-        self.depth_intrinsic.fy = 424.248107910156
+        self.depth_intrinsic.ppx = 317.862670898438
+        self.depth_intrinsic.ppy =239.181976318359
+        self.depth_intrinsic.fx = 384.224700927734
+        self.depth_intrinsic.fy = 384.224700927734
         self.depth_intrinsic.model = rs.distortion.brown_conrady
         self.depth_intrinsic.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
 
         #Tracking leader
         self.tracked_idx=-1
         self.aruco_data = {"success": False, "position": [0, 0]}
-        self.tracked_person_pose = PoseStamped()
+        ## Transforming coodinates
         self.tracked_person_position = PointStamped()
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer,self)
         self.frame_source = self.declare_parameter(
-          'target_frame', 'camera_color_optical_frame').get_parameter_value().string_value
-        #self.frame_source='camera_color_optical_frame'
-        self.frame_target='base_link'
+          'source_frame', 'camera_color_optical_frame').get_parameter_value().string_value
+        self.frame_target = self.declare_parameter(
+          'target_frame', 'base_link').get_parameter_value().string_value    
+        self.transform_acquired_base_camera=False
 
+
+
+        #Testing related
         _sub=str(np.random.randint(0,10000))
-        self.video_recorder = cv2.VideoWriter('/home/romatris/Workspace/Misc/TestVideos/A/a1.3.1-a1.3.3'+_sub+'.mp4', 
-                         cv2.VideoWriter_fourcc(*'MJPG'),
-                         10, (848,480))
-
+        self.video_recorder = cv2.VideoWriter('/home/romatris/Workspace/Misc/TestVideos/A/a1.1.4-a1.1.6'+_sub+'.mp4', 
+                         cv2.VideoWriter_fourcc(*'MJPG'),10, (640,480))
+        ###
         self.cvbridge = CvBridge()
         self.robot_stream_colour = None 
         self.predictor=predictor
@@ -211,10 +207,13 @@ class TrackerByte(Node):
         https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
         https://dev.intelrealsense.com/docs/projection-in-intel-realsense-sdk-20
 
+        https://github.com/IntelRealSense/realsense-ros/issues/1870
+
         '''
-        robot_stream_depth = self.cvbridge.imgmsg_to_cv2(msg, desired_encoding="passthrough") 
+        robot_stream_depth = self.cvbridge.imgmsg_to_cv2(msg, desired_encoding="16UC1") 
         ## The scale of depth pixels is 0.001|  16bit depth, one unit is 1 mm | taken from data sheet 
         self.robot_stream_depth = np.array(robot_stream_depth, dtype=np.uint16)*0.001
+
 
     def aruco_data_callback(self,msg):
         '''
@@ -302,8 +301,51 @@ class TrackerByte(Node):
         depth=self.robot_stream_depth[y,x]             
         pixel_point=[float(x),float(y)]
         position=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
+        prin="Pixel point x "+str(pixel_point[0])+"y "+str(pixel_point[1])+"depth "+str(depth)
+        # cv2.putText(self.robot_stream_colour, prin, (10,30),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
         
         return position
+
+    def coordinate_transform(self,position):
+        '''
+        Getting the static transform between the camera and base link
+        Getting the transform only once because it static and no need
+        to check often
+
+        Args:
+        position: The position coodinates in camera_link frame
+
+        Returns:
+        position: The psotion coodinates in base_link frame
+        '''        
+        if not self.transform_acquired_base_camera:
+            counter=0
+            #Tries 10 times to get the transfomation 
+            while (not self.transform_acquired_base_camera) and (counter<10) :
+                try:
+                    counter+=1
+                    self.tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
+                    self.get_logger().info(f'Static transform from base_link to camera aquired ')                
+                    self.transform_acquired_base_camera=True
+                except TransformException as ex:
+                    self.get_logger().info(f"Could to find tf transform {ex}")
+        else:
+            r_x=self.tranformer.transform.rotation.x
+            r_y=self.tranformer.transform.rotation.y
+            r_z=self.tranformer.transform.rotation.z
+            r_w=self.tranformer.transform.rotation.w
+            x=self.tranformer.transform.translation.x
+            y=self.tranformer.transform.translation.x
+            z=self.tranformer.transform.translation.z
+
+            rot=np.array([r_x,r_y,r_z,r_w])
+            trans=np.array([x,y,z])
+            rotation_mat=np.asarray((Rotation.from_quat(rot)).as_matrix())
+            homo_transform=np.hstack((np.vstack((rotation_mat,[0.0,0.0,0.0])),np.vstack((trans.reshape(3,1),1.0))))
+            self.get_logger().info(f"In the transform")
+
+            return (np.delete(np.dot(homo_transform,[position.point.x,position.point.y,position.point.z,1]),-1))      
+
 
     def imageflow_demo(self):  
         frame = self.robot_stream_colour
@@ -336,56 +378,52 @@ class TrackerByte(Node):
                     tracked_position=self.get_position(tracked_bbox)
                     center=(int((tracked_bbox[0][0]+tracked_bbox[1][0])/2),int((tracked_bbox[0][1]+tracked_bbox[1][1])/2))
                     cv2.circle(self.robot_stream_colour, center, 4, (0,255,2), 2)
-                    self.video_recorder.write(self.robot_stream_colour)
+                    poss="3D pos o"+str(round(tracked_position[0],3))+" 1 "+str(round(tracked_position[1],3))+" 2 "+str(round(tracked_position[2],3))
 
-                       
+                    # cv2.putText(self.robot_stream_colour, poss, (10,100),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+
                     #In the camera Frame Z in the X direction in robot coordinate system 
                     #Here we take that into account
-                    self.tracked_person_position.header.frame_id = self.frame_source
+                    self.tracked_person_position.header.frame_id = self.frame_target
                     self.tracked_person_position.point.x = tracked_position[2]
                     self.tracked_person_position.point.y = tracked_position[0]
                     self.tracked_person_position.point.z = tracked_position[1]                
                     ##Check if the transformation is available 
-                    
-                    # if self.tf_buffer.can_transform(self.frame_source,self.frame_target, rclpy.time.Time()):
-                        # try:
-                        #     #Transform the pose to base_link frame
-                        #     #Source https://w3.cs.jmu.edu/spragunr/CS354_S19/lectures/tf/tf2_demo.py
-                        #     self.tracked_person_position=self.tf_buffer.transform(self.tracked_person_position,self.frame_target)
-                        #     print_pos=str(round(self.tracked_person_position.point.x,2))+" m"
-                        #     cv2.putText(self.robot_stream_colour, print_pos, (tracked_bbox[0][0]+10,tracked_bbox[0][1]),
-                        #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
-                        # except TransformException as ex:
-                        #     self.get_logger().info(f"TF error: {ex}")
+
+                    if self.transform_acquired_base_camera:
+
+                        transformed_point=self.coordinate_transform(self.tracked_person_position)
+                        self.get_logger().info(f"Got transform")
+
+                        self.tracked_person_position.point.x = transformed_point[0]
+                        self.tracked_person_position.point.y = transformed_point[1]
+                        self.tracked_person_position.point.z = transformed_point[2]
+
+                        print_pos="Transformed X:"+str(round(transformed_point[0],2))+"Y: "+str(round(transformed_point[1],2))+"Z: "+str(round(transformed_point[2],2))
+                        # cv2.putText(self.robot_stream_colour, print_pos, (10,200),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+
+                    else:
+                        transformed_point=self.coordinate_transform(self.tracked_person_position)
+                        self.get_logger().info(f"Transform not acquired")
+      
                     self.publisher_tracked_person.publish(self.tracked_person_position)
                 
 
-                    # self.tracked_person_pose.header.stamp = self.get_clock().now().to_msg()
-                    # self.tracked_person_pose.header.frame_id = "base_link"
-
-                    # self.tracked_person_pose.pose.position.x = tracked_position[0]
-                    # self.tracked_person_pose.pose.position.y = tracked_position[1]
-                    # self.tracked_person_pose.pose.position.z = tracked_position[2]
-
-                    # self.tracked_person_pose.pose.orientation.x = 0.0
-                    # self.tracked_person_pose.pose.orientation.y = 0.0
-                    # self.tracked_person_pose.pose.orientation.z = 0.0
-                    # self.tracked_person_pose.pose.orientation.w = 1.0
-                    # self.publisher_tracked_person.publish(self.tracked_person_pose)
 
                 else:
                     self.get_logger().info(f'Transform not possible')
                     pass
-                   #cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
-                   #         cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+                    cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
 
 
 
             else:
                 self.timer.toc()
             cv2.imshow("Tracked",self.robot_stream_colour)
-            cv2.waitKey(1)
             self.video_recorder.write(self.robot_stream_colour)
+            cv2.waitKey(1)
+            
 
         else:
             pass

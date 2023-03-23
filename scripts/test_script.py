@@ -9,7 +9,7 @@ from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from geometry_msgs.msg import PoseStamped,PointStamped,Point
-from tf2_geometry_msgs import PointStamped
+# from tf2_geometry_msgs import PointStamped
 from rclpy.duration import Duration
 import time 
 from scipy.spatial.transform import Rotation
@@ -479,54 +479,63 @@ class TfTransform(Node):
           'source_frame', 'camera_color_optical_frame').get_parameter_value().string_value
         self.frame_target = self.declare_parameter(
           'target_frame', 'base_link').get_parameter_value().string_value
-        # self.frame_source='camera_color_optical_frame'
-        # self.frame_target='base_link'
+   
 
-        self.tracked_person_position= PoseStamped()
         self.tracked_person_point= PointStamped()
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer,self)
-        # self.check_transform()
-        # self.timer = self.create_timer(0.2, self.check_transform)
-        self.tracked_person_position.header.frame_id=self.frame_source
-        self.tracked_person_position.pose.orientation.x = 0.0
-        self.tracked_person_position.pose.orientation.y = 0.0
-        self.tracked_person_position.pose.orientation.z = 0.0
-        self.tracked_person_position.pose.orientation.w = 1.0
-
-        self.tracked_person_point.header.frame_id = 'camera_depth_optical_frame'
+        self.transform_acquired_base_camera=False
+        
+       
+        self.tracked_person_point.header.frame_id = self.frame_source
+        self.tracked_person_point.point.x = 0.0
+        self.tracked_person_point.point.y = 0.0
+        self.tracked_person_point.point.z = 0.0   
 
 
+        #Call the function to get tf static transform once 
+        self.coordinate_transform(self.tracked_person_point)
 
 
-    def coordinate_transform(self,t_x,t_y,t_z,r_x,r_y,r_z,r_w,position):
+
+    def coordinate_transform(self,position):
         '''
-        '''
-        self.tracked_person_point.point.x = float(np.random.randint(0,30))
-        self.tracked_person_point.point.y = float(np.random.randint(0,30))
-        self.tracked_person_point.point.z = float(np.random.randint(0,30)) 
+        Getting the static transform between the camera and base link
+        Getting the transform only once because it static and no need
+        to check often
 
-        rot_x=tranformer.transform.rotation.x
-        rot_y=tranformer.transform.rotation.y
-        rot_z=tranformer.transform.rotation.z
-        rot_w=tranformer.transform.rotation.w
-        tran_x=tranformer.transform.translation.x
-        tran_y=tranformer.transform.translation.x
-        tran_z=tranformer.transform.translation.z
+        Args:
+        position: The position coodinates in camera_link frame
 
+        Returns:
+        position: The psotion coodinates in base_link frame
+        '''        
+        if not self.transform_acquired_base_camera:
+            counter=0
+            while (not self.transform_acquired_base_camera) and (counter<10) :
+                try:
+                    counter+=1
+                    self.tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
+                    self.get_logger().info(f'Static transform from base_link to camera aquired {self.tranformer}')                
+                    self.transform_acquired_base_camera=True
+                except TransformException as ex:
+                    self.get_logger().info(f"Could to find tf transform {ex}")
+        else:
+            r_x=self.tranformer.transform.rotation.x
+            r_y=self.tranformer.transform.rotation.y
+            r_z=self.tranformer.transform.rotation.z
+            r_w=self.tranformer.transform.rotation.w
+            x=self.tranformer.transform.translation.x
+            y=self.tranformer.transform.translation.x
+            z=self.tranformer.transform.translation.z
 
-    def coordinate_transform_2(self,transformer,position):
-        '''
-        '''
-      
-        rot_x=tranformer.transform.rotation.x
-        rot_y=tranformer.transform.rotation.y
-        rot_z=tranformer.transform.rotation.z
-        rot_w=tranformer.transform.rotation.w
-        tran_x=tranformer.transform.translation.x
-        tran_y=tranformer.transform.translation.x
-        tran_z=tranformer.transform.translation.z
+            rot=np.array([r_x,r_y,r_z,r_w])
+            trans=np.array([x,y,z])
+            rotation_mat=np.asarray((Rotation.from_quat(rot)).as_matrix())
+            homo_transform=np.hstack((np.vstack((rotation_mat,[0.0,0.0,0.0])),np.vstack((trans.reshape(3,1),1.0))))
+            self.get_logger().info(f"In the transform")
 
+            return (np.delete(np.dot(homo_transform,[position.point.x,position.point.y,position.point.z,1]),-1))      
 
     def camera_image_raw_callback(self,msg):
         self.tracked_person_position.header.stamp=self.get_clock().now().to_msg()
@@ -538,6 +547,19 @@ class TfTransform(Node):
         self.tracked_person_point.point.x = float(np.random.randint(0,30))
         self.tracked_person_point.point.y = float(np.random.randint(0,30))
         self.tracked_person_point.point.z = float(np.random.randint(0,30))    
+
+        if self.transform_acquired_base_camera:
+
+            transformed_point=self.coordinate_transform(self.tracked_person_point)
+            self.get_logger().info(f"Got transofr {transformed_point}")
+
+            self.tracked_person_point.point.x = transformed_point[0]
+            self.tracked_person_point.point.y = transformed_point[1]
+            self.tracked_person_point.point.z = transformed_point[2]
+
+        else:
+            transformed_point=self.coordinate_transform(self.tracked_person_point)
+            self.get_logger().info(f"Transform not acquired")
 
         
 
@@ -559,24 +581,24 @@ class TfTransform(Node):
         # else:
         #     self.get_logger().info(f"can_transform failed")
 
-        try:
-            tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
-            rot_x=tranformer.transform.rotation.x
-            rot_y=tranformer.transform.rotation.y
-            rot_z=tranformer.transform.rotation.z
-            rot_w=tranformer.transform.rotation.w
-            tran_x=tranformer.transform.translation.x
-            tran_y=tranformer.transform.translation.x
-            tran_z=tranformer.transform.translation.z
-            self.coordinate_transform(tran_x,tran_x)
-            rot_quat=Rotation.from_quat('xyzw', [rot_x,rot_y, rot_z,rot_w], degrees=False)
-            rot_euler=rot_quat.as_euler()
-            # self.tracked_person_point = tf2_geometry_msgs.do_transform_point(self.tracked_person_point, transform)
+        # try:
+        #     tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
+        #     rot_x=tranformer.transform.rotation.x
+        #     rot_y=tranformer.transform.rotation.y
+        #     rot_z=tranformer.transform.rotation.z
+        #     rot_w=tranformer.transform.rotation.w
+        #     tran_x=tranformer.transform.translation.x
+        #     tran_y=tranformer.transform.translation.x
+        #     tran_z=tranformer.transform.translation.z
+        #     self.coordinate_transform(tran_x,tran_x)
+        #     rot_quat=Rotation.from_quat('xyzw', [rot_x,rot_y, rot_z,rot_w], degrees=False)
+        #     rot_euler=rot_quat.as_euler()
+        #     # self.tracked_person_point = tf2_geometry_msgs.do_transform_point(self.tracked_person_point, transform)
 
-            self.get_logger().info(f'Running tranform')
+        #     self.get_logger().info(f'Running tranform')
 
-        except TransformException as ex:
-            self.get_logger().info(f"Could to find tf transform {ex}")
+        # except TransformException as ex:
+        #     self.get_logger().info(f"Could to find tf transform {ex}")
 
 
             
