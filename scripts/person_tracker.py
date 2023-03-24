@@ -251,7 +251,7 @@ class TrackerByte(Node):
             if id==self.tracked_idx:
                 lead_idx=index
         ## If leader is unknown and marker is available look for leader
-        if (lead_idx is None) and (self.aruco_data["success"]==True):
+        if (lead_idx is None) or (self.aruco_data["success"]==True):
             aruco_center=[int(self.aruco_data["position"][0]),int(self.aruco_data["position"][1])]                
             for index,id in enumerate(ids):
                 x1=(tracked_bboxs[index][0])
@@ -261,7 +261,7 @@ class TrackerByte(Node):
                 if (aruco_center[0]>=x1) and (aruco_center[0]<=(x1+w)) and (aruco_center[1]>=y1) and (aruco_center[1]<=(y1+h)):
                     bbox=[[int(x1),int(y1)],[int(x1+w),int(y1+h)]]   
                     self.tracked_idx=id
-                    self.get_logger().info(f"Found man {id}")       
+                    self.get_logger().info(f"Found leader with Id: {id}")       
         #Get the bounding box coordinates of the leader
         elif lead_idx is not None:                    
             x1=int(tracked_bboxs[lead_idx][0])
@@ -411,8 +411,6 @@ class TrackerByte(Node):
 
 
                 else:
-                    self.get_logger().info(f'Transform not possible')
-                    pass
                     cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
 
