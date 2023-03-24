@@ -173,12 +173,13 @@ class TrackerByte(Node):
         self.transform_acquired_base_camera=False
 
 
-
+        self.record_video=False
         #Testing related
         _sub=str(np.random.randint(0,10000))
-        self.video_recorder = cv2.VideoWriter('/home/romatris/Workspace/Misc/TestVideos/A/a1.1.4-a1.1.6'+_sub+'.mp4', 
-                         cv2.VideoWriter_fourcc(*'MJPG'),10, (640,480))
-        ###
+        if self.record_video:
+            self.video_recorder = cv2.VideoWriter('/home/romatris/Workspace/Misc/TestVideos/A/a1.3.4-a1.3.6_trial_2_'+_sub+'.mp4', 
+                            cv2.VideoWriter_fourcc(*'MJPG'),10, (640,480))
+            ###
         self.cvbridge = CvBridge()
         self.robot_stream_colour = None 
         self.predictor=predictor
@@ -390,7 +391,6 @@ class TrackerByte(Node):
                     center=(int((tracked_bbox[0][0]+tracked_bbox[1][0])/2),int((tracked_bbox[0][1]+tracked_bbox[1][1])/2))
                     cv2.circle(self.robot_stream_colour, center, 4, (0,255,2), 2)
                     poss="3D pos o"+str(round(tracked_position[0],3))+" 1 "+str(round(tracked_position[1],3))+" 2 "+str(round(tracked_position[2],3))
-
                     # cv2.putText(self.robot_stream_colour, poss, (10,100),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
                     #In the camera Frame Z in the X direction in robot coordinate system 
@@ -430,7 +430,8 @@ class TrackerByte(Node):
             else:
                 self.timer.toc()
             cv2.imshow("Tracked",self.robot_stream_colour)
-            self.video_recorder.write(self.robot_stream_colour)
+            if self.record_video:
+                self.video_recorder.write(self.robot_stream_colour)
             cv2.waitKey(1)
             
 

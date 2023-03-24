@@ -31,11 +31,22 @@ First run the following script to launch the Intel Realsense camera
 ros2 launch realsense2_camera d400e_rs_launch.py
 ```
 
-To run the entire pipeline run the following command
-
-```shell
-ros2 launch person_following_robot follow_person
+To run the entire pipeline run the following command. 
+Before this you will have to activate the virtual envrioment. Which can be done by using the alias 
 ```
+activate_person_following_robot_venv
+```
+Then to run the launch file
+```shell
+ros2 launch person_following_robot follow_person.launch.py
+```
+
+To record the test data 
+- First go to  scripts/person_tracker.py 
+- Go to the init function of the trackeByte Node(approximately at line 176)
+- In here you have to set the self.record_video=True
+- Then in two lines below (approximately line 180) change the file name 
+- Now just run the launch file to start camera node then the launch file to start person tracker
 
 If you need to run individual scripts use the following format, <span style="color:red">Note:</span> the namespace argument is important 
 
