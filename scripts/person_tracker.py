@@ -142,11 +142,15 @@ class TrackerByte(Node):
         self._subscriber_aruco_data 
 
 
-        self.publisher_tracked_person = self.create_publisher(
+        self.publisher_tracked_person_position = self.create_publisher(
                                         PointStamped,
                                         'tracked_person/position', 
                                         10)
 
+        self.publisher_tracked_person_image_raw = self.create_publisher(
+                                        Image,
+                                        'tracked_person/image_raw', 
+                                        10)
 
         ## Pyrealsense depth instrics of the depth camera taken running the command 'rs-enumerate-devices -c'in terminal
         self.depth_intrinsic = rs.intrinsics()
@@ -386,7 +390,10 @@ class TrackerByte(Node):
                 tracked_bbox=self.check_leader(online_tlwhs, online_ids)
                 #Leader is available publish leader pose 
                 if len(tracked_bbox)>0:
+                    tracked_leader_image=self.robot_stream_colour[tracked_bbox[0][0]:tracked_bbox[0][1],tracked_bbox[1][0]:tracked_bbox[1][1]]
+                    self.publisher_tracked_person_image_raw.publish(self.cvbridge.cv2_to_imgmsg(tracked_leader_image))
                     cv2.rectangle(self.robot_stream_colour,tracked_bbox[0],tracked_bbox[1], (255,0,0), 2, 1)
+                    
                     tracked_position=self.get_position(tracked_bbox)
                     center=(int((tracked_bbox[0][0]+tracked_bbox[1][0])/2),int((tracked_bbox[0][1]+tracked_bbox[1][1])/2))
                     cv2.circle(self.robot_stream_colour, center, 4, (0,255,2), 2)
@@ -417,7 +424,7 @@ class TrackerByte(Node):
                         transformed_point=self.coordinate_transform(self.tracked_person_position)
                         self.get_logger().info(f"Transform not acquired")
       
-                    self.publisher_tracked_person.publish(self.tracked_person_position)
+                    self.publisher_tracked_person_position.publish(self.tracked_person_position)
                 
 
 
