@@ -28,11 +28,11 @@ This has to be installed as a python package to do this
 First run the following script to launch the Intel Realsense camera
 
 ```
-ros2 launch realsense2_camera d400e_rs_launch.py
+ros2 launch realsense2_camera d400e_rs_launch.py spatial_filter.enable:=true -p temporal_filter.enable:=true decimation_filter.enable:=true 
 ```
 
 To run the entire pipeline run the following command. 
-Before this you will have to activate the virtual envrioment. Which can be done by using the alias 
+Before this you will have to activate the virtual environment. Which can be done by using the alias 
 ```
 activate_person_following_robot_venv
 ```
@@ -42,7 +42,7 @@ ros2 launch person_following_robot follow_person.launch.py
 ```
 
 To record the test data 
-- First go to  scripts/person_tracker.py 
+- First go to scripts/person_tracker.py 
 - Go to the init function of the trackeByte Node(approximately at line 176)
 - In here you have to set the self.record_video=True
 - Then in two lines below (approximately line 180) change the file name 
