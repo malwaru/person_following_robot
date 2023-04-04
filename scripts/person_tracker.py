@@ -314,7 +314,7 @@ class TrackerByte(Node):
         pixel_point=[float(x),float(y)]
         position=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
         prin="Pixel point x "+str(pixel_point[0])+"y "+str(pixel_point[1])+"depth "+str(depth)
-        # cv2.putText(self.robot_stream_colour, prin, (10,30),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+        cv2.putText(self.robot_stream_colour, prin, (10,30),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
         
         return position
 
@@ -391,7 +391,7 @@ class TrackerByte(Node):
                     center=(int((tracked_bbox[0][0]+tracked_bbox[1][0])/2),int((tracked_bbox[0][1]+tracked_bbox[1][1])/2))
                     cv2.circle(self.robot_stream_colour, center, 4, (0,255,2), 2)
                     poss="3D pos o"+str(round(tracked_position[0],3))+" 1 "+str(round(tracked_position[1],3))+" 2 "+str(round(tracked_position[2],3))
-                    # cv2.putText(self.robot_stream_colour, poss, (10,100),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                    cv2.putText(self.robot_stream_colour, poss, (10,100),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
                     #In the camera Frame Z in the X direction in robot coordinate system 
                     #Here we take that into account
@@ -411,7 +411,7 @@ class TrackerByte(Node):
                         self.tracked_person_position.point.z = transformed_point[2]
 
                         print_pos="Transformed X:"+str(round(transformed_point[0],2))+"Y: "+str(round(transformed_point[1],2))+"Z: "+str(round(transformed_point[2],2))
-                        # cv2.putText(self.robot_stream_colour, print_pos, (10,200),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                        cv2.putText(self.robot_stream_colour, print_pos, (10,200),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
                     else:
                         transformed_point=self.coordinate_transform(self.tracked_person_position)
