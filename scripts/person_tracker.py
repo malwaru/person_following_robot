@@ -337,7 +337,7 @@ class TrackerByte(Node):
         if not self.transform_acquired_base_camera:
             counter=0
             #Tries 10 times to get the transfomation 
-            while (not self.transform_acquired_base_camera) and (counter<10) :
+            while (not self.transform_acquired_base_camera) and (counter<100) :
                 try:
                     counter+=1
                     self.tranformer=self.tf_buffer.lookup_transform(source_frame=self.frame_source,target_frame=self.frame_target,time=rclpy.time.Time())
@@ -390,8 +390,8 @@ class TrackerByte(Node):
                 tracked_bbox=self.check_leader(online_tlwhs, online_ids)
                 #Leader is available publish leader pose 
                 if len(tracked_bbox)>0:
-                    tracked_leader_image=self.robot_stream_colour[tracked_bbox[0][0]:tracked_bbox[0][1],tracked_bbox[1][0]:tracked_bbox[1][1]]
-                    self.publisher_tracked_person_image_raw.publish(self.cvbridge.cv2_to_imgmsg(tracked_leader_image))
+                    #tracked_leader_image=self.robot_stream_colour[tracked_bbox[0][0]:tracked_bbox[0][1],tracked_bbox[1][0]:tracked_bbox[1][1]]
+                    #self.publisher_tracked_person_image_raw.publish(self.cvbridge.cv2_to_imgmsg(tracked_leader_image))
                     cv2.rectangle(self.robot_stream_colour,tracked_bbox[0],tracked_bbox[1], (255,0,0), 2, 1)
                     
                     tracked_position=self.get_position(tracked_bbox)
