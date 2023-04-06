@@ -49,8 +49,9 @@ def main():
       LoggingSeverity.INFO
    )
    # Transformation parameters
+   #Original child frame :   camera_link
    tansformation = {"parent_frame": "base_link",
-                  "child_frame": "camera_link",
+                  "child_frame": "camera_color_optical_frame",
                   "transform": [0.2,0.065, 0.4, 0, 0, 0]}
 # pass parameters and initialize node
    rclpy.init()

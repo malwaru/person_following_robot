@@ -29,6 +29,9 @@ from yolox.utils.visualize import plot_tracking
 from yolox.tracker.byte_tracker import BYTETracker
 from yolox.tracking_utils.timer import Timer
 
+#Other imports
+import copy
+
 
 
 class ByteParams():
@@ -193,6 +196,7 @@ class TrackerByte(Node):
         self.timer = Timer()
         self.frame_id = 0
         self.results = []
+        self.tracked_person_mask=np.zeros(shape=(480,640),dtype=np.uint8)
 
     def camera_image_raw_callback(self,msg):
         '''
@@ -302,25 +306,31 @@ class TrackerByte(Node):
 
         Returns:
         -------
-        position [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
-        
+        position_3d [x,y,z] the 3D coordinates of pixels p1,p2 the 3D points in camera frame 
+        clipped_bbox : Bounding box coordinates after making sure they fit within the image dimensions
+                      :pixel where depth is acquired         
         '''
         #Clipping bbox cooridinates outside the frame
-        l= (self.robot_stream_depth.shape)[0]
+        h= (self.robot_stream_depth.shape)[0]
         w= (self.robot_stream_depth.shape)[1]
         x1=np.clip(tracked_bbox[0][0],0,w-1)
-        x2=np.clip(tracked_bbox[0][1],0,w-1)
-        y1=np.clip(tracked_bbox[1][0],0,l-1)
-        y2=np.clip(tracked_bbox[1][1],0,l-1)
+        x2=np.clip(tracked_bbox[1][0],0,w-1)
+        y1=np.clip(tracked_bbox[0][1],0,h-1)
+        y2=np.clip(tracked_bbox[1][1],0,h-1)
+
+        #Make sure coordinates are within image size
+        clipped_bbox=[[x1,y1],[x2,y2]]
+        #Instead of mid point acrquiring depth 1/3 from top of the Bbox
         x= int((x1+x2)/2)
-        y= int((y1+y2)/2)       
-        depth=self.robot_stream_depth[y,x]             
-        pixel_point=[float(x),float(y)]
-        position=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
+        y=int(y1+((y2-y1)/3))
+        depth_pixel=[x,y]
+        depth=self.robot_stream_depth[depth_pixel[1],depth_pixel[0]]             
+        pixel_point=[float(depth_pixel[0]),float(depth_pixel[1])]
+        position_3d=rs.rs2_deproject_pixel_to_point(self.depth_intrinsic ,pixel_point,depth)
         prin="Pixel point x "+str(pixel_point[0])+"y "+str(pixel_point[1])+"depth "+str(depth)
-        cv2.putText(self.robot_stream_colour, prin, (10,30),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+        # cv2.putText(self.robot_stream_colour, prin, (10,30),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
         
-        return position
+        return position_3d,clipped_bbox,depth_pixel
 
     def coordinate_transform(self,position):
         '''
@@ -358,8 +368,7 @@ class TrackerByte(Node):
             trans=np.array([x,y,z])
             rotation_mat=np.asarray((Rotation.from_quat(rot)).as_matrix())
             homo_transform=np.hstack((np.vstack((rotation_mat,[0.0,0.0,0.0])),np.vstack((trans.reshape(3,1),1.0))))
-            self.get_logger().info(f"In the transform")
-
+            # self.get_logger().info(f"In the transform")
             return (np.delete(np.dot(homo_transform,[position.point.x,position.point.y,position.point.z,1]),-1))      
 
 
@@ -389,16 +398,20 @@ class TrackerByte(Node):
 
                 tracked_bbox=self.check_leader(online_tlwhs, online_ids)
                 #Leader is available publish leader pose 
-                if len(tracked_bbox)>0:
-                    #tracked_leader_image=self.robot_stream_colour[tracked_bbox[0][0]:tracked_bbox[0][1],tracked_bbox[1][0]:tracked_bbox[1][1]]
-                    #self.publisher_tracked_person_image_raw.publish(self.cvbridge.cv2_to_imgmsg(tracked_leader_image))
-                    cv2.rectangle(self.robot_stream_colour,tracked_bbox[0],tracked_bbox[1], (255,0,0), 2, 1)
-                    
-                    tracked_position=self.get_position(tracked_bbox)
-                    center=(int((tracked_bbox[0][0]+tracked_bbox[1][0])/2),int((tracked_bbox[0][1]+tracked_bbox[1][1])/2))
+                if len(tracked_bbox)>0:               
+  
+                    tracked_position,clipped_bbox,depth_pixel=self.get_position(tracked_bbox)
+                    center=(depth_pixel[0],depth_pixel[1])
                     cv2.circle(self.robot_stream_colour, center, 4, (0,255,2), 2)
-                    poss="3D pos o"+str(round(tracked_position[0],3))+" 1 "+str(round(tracked_position[1],3))+" 2 "+str(round(tracked_position[2],3))
-                    cv2.putText(self.robot_stream_colour, poss, (10,100),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                    cv2.rectangle(self.tracked_person_mask, (clipped_bbox[0][0],clipped_bbox[0][1]),(clipped_bbox[1][0],clipped_bbox[1][1]), 255, -1)
+                    tracked_leader_image=cv2.bitwise_and(self.robot_stream_colour,self.robot_stream_colour,mask=self.tracked_person_mask)
+                    self.publisher_tracked_person_image_raw.publish(self.cvbridge.cv2_to_imgmsg(tracked_leader_image))
+                    cv2.imshow("tracked man",tracked_leader_image)
+                    self.tracked_person_mask*=0
+                    cv2.rectangle(self.robot_stream_colour,tracked_bbox[0],tracked_bbox[1], (255,0,0), 2, 1)                    
+
+                    # poss="3D pos o"+str(round(tracked_position[0],3))+" 1 "+str(round(tracked_position[1],3))+" 2 "+str(round(tracked_position[2],3))
+                    # cv2.putText(self.robot_stream_colour, poss, (10,100),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
                     #In the camera Frame Z in the X direction in robot coordinate system 
                     #Here we take that into account
@@ -407,18 +420,15 @@ class TrackerByte(Node):
                     self.tracked_person_position.point.y = tracked_position[0]
                     self.tracked_person_position.point.z = tracked_position[1]                
                     ##Check if the transformation is available 
-
                     if self.transform_acquired_base_camera:
 
                         transformed_point=self.coordinate_transform(self.tracked_person_position)
-                        self.get_logger().info(f"Got transform")
-
                         self.tracked_person_position.point.x = transformed_point[0]
                         self.tracked_person_position.point.y = transformed_point[1]
                         self.tracked_person_position.point.z = transformed_point[2]
 
                         print_pos="Transformed X:"+str(round(transformed_point[0],2))+"Y: "+str(round(transformed_point[1],2))+"Z: "+str(round(transformed_point[2],2))
-                        cv2.putText(self.robot_stream_colour, print_pos, (10,200),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
+                        # cv2.putText(self.robot_stream_colour, print_pos, (10,200),cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,2550,0),2)
 
                     else:
                         transformed_point=self.coordinate_transform(self.tracked_person_position)
@@ -431,6 +441,9 @@ class TrackerByte(Node):
                 else:
                     cv2.putText(self.robot_stream_colour, "Leader not found", (100,80), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+                    #Publish a black image if leader is lost 
+                    self.publisher_tracked_person_image_raw.publish(self.cvbridge.cv2_to_imgmsg(np.zeros(shape=self.robot_stream_colour.shape,dtype=np.uint8)))
+
 
 
 
@@ -477,7 +490,6 @@ def main(args=None):
   
     #Start of ByteTracker
     output_dir = osp.join(exp.output_dir, exp.exp_name)
-    #os.makedirs(output_dir, exist_ok=True)
 
     if args.trt:
         args.device = "gpu"

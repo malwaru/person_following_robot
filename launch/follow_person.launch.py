@@ -33,7 +33,13 @@ def generate_launch_description():
     #     namespace="camera"       
 
     # )
-    
+    camera_description = Node(
+        package="realsense2_description",
+        executable="view_model.launch.py",
+        parameters=[
+                { "model":'test_d455_camera.urdf.xacro'}
+                ]
+    )
 
     tf_broadcaster=Node(
         package="person_following_robot",
@@ -65,8 +71,10 @@ def generate_launch_description():
 
     ld.add_action(tf_broadcaster)
     ld.add_action(aruco_detector) 
-    # ld.add_action(test_script)   
     ld.add_action(person_tracker)
+    # ld.add_action(test_script)   
+
+    # ld.add_action(camera_description)
 
 
     return ld
